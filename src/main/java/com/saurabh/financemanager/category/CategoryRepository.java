@@ -12,5 +12,6 @@ import java.util.UUID;
 public interface CategoryRepository extends JpaRepository<Category, UUID> {
 
     List<Category> findByTransactionType(TransactionType transactionType);
+    boolean existsByNameIgnoreCaseAndTransactionType(String name,TransactionType transactionType);
 
 }

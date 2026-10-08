@@ -2,6 +2,8 @@ package com.saurabh.financemanager.category;
 
 import com.saurabh.financemanager.category.dto.CategoryRequest;
 import com.saurabh.financemanager.category.dto.CategoryResponse;
+import com.saurabh.financemanager.exception.DuplicateResourceException;
+import com.saurabh.financemanager.exception.ResourceNotFoundException;
 import com.saurabh.financemanager.transaction.TransactionType;
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Service;
@@ -22,17 +24,25 @@ public class CategoryService {
 
     public CategoryResponse createCategory(CategoryRequest categoryRequest) {
 
+        String name=categoryRequest.getName().trim();
+        if (categoryRepository.existsByNameIgnoreCaseAndTransactionType(name, categoryRequest.getTransactionType())){
+            throw new DuplicateResourceException(
+                    "Category '"+name+"' already exists for type "+categoryRequest.getTransactionType()
+            );
+        }
+
         Category category = mapToEntity(categoryRequest);
+        category.setName(name);
 
-        Category categoryResponse = categoryRepository.save(category);
+        Category savedCategory = categoryRepository.save(category);
 
-        return mapToDto(categoryResponse);
+        return mapToDto(savedCategory);
 
     }
 
     public CategoryResponse getCategory(UUID id) {
         Category response = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category Not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Category Not found"));
         return mapToDto(response);
     }
 
@@ -77,7 +87,7 @@ public class CategoryService {
 
     public CategoryResponse update(UUID id, CategoryRequest categoryRequest) {
         Category existingCategory = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
 
         existingCategory.setName(categoryRequest.getName());
         existingCategory.setTransactionType(categoryRequest.getTransactionType());
