@@ -75,3 +75,31 @@ Being honest about what's not finished yet:
 4. Start the Transaction feature, linked to categories
 
 ---
+## 2026-10-08: Global error handling
+
+Done:
+- Same JSON error format for every error (ErrorResponse)
+- 404 for missing resources, 409 for duplicates, 400 for invalid
+  input, generic 500 for unexpected errors
+- One GlobalExceptionHandler, so controllers need no try/catch
+
+Fixed:
+- Not-found and duplicate errors no longer return 500
+
+## 2026-10-08: Transaction feature
+
+Done:
+- Transaction CRUD, linked to categories
+- Filter by month and category, newest first
+- Transaction type must match the category type
+- Categories in use can't be deleted
+
+Decisions:
+- BigDecimal for money, amounts always positive, type decides in or out
+- Refuse deleting a used category instead of losing its transactions
+
+Known issues:
+- N+1 queries when listing transactions; fix later with a join fetch
+
+Next:
+- Budget feature
