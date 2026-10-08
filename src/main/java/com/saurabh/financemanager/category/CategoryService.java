@@ -4,6 +4,8 @@ import com.saurabh.financemanager.category.dto.CategoryRequest;
 import com.saurabh.financemanager.category.dto.CategoryResponse;
 import com.saurabh.financemanager.exception.DuplicateResourceException;
 import com.saurabh.financemanager.exception.ResourceNotFoundException;
+import com.saurabh.financemanager.exception.ConflictException;
+import com.saurabh.financemanager.transaction.TransactionRepository;
 import com.saurabh.financemanager.transaction.TransactionType;
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Service;
@@ -15,10 +17,12 @@ import java.util.UUID;
 @Service
 public class CategoryService {
 
-    private CategoryRepository categoryRepository;
+    private final CategoryRepository categoryRepository;
+    private final TransactionRepository transactionRepository;
 
-    public CategoryService(CategoryRepository categoryRepository) {
+    public CategoryService(CategoryRepository categoryRepository, TransactionRepository transactionRepository) {
         this.categoryRepository = categoryRepository;
+        this.transactionRepository=transactionRepository;
     }
 
 
@@ -58,6 +62,15 @@ public class CategoryService {
     public void delete(UUID id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Category not found"));
+
+        long categoryUsage= transactionRepository.countByCategoryId(id);
+
+        if (categoryUsage>0){
+            throw new ConflictException(
+                    "Category '" +category.getName() + "' is used by " + categoryUsage+ " transactions and cannot be delted"
+            );
+        }
+
         categoryRepository.delete(category);
     }
 
