@@ -103,3 +103,19 @@ Known issues:
 
 Next:
 - Budget feature
+
+## 2026-10-09: Budget feature
+
+Done:
+- Monthly budget per expense category
+- List budgets by month, update the limit, delete
+- Category deletion now also checks budgets
+
+Decisions:
+- Month stored as the first day of the month, sent as "2026-10" in the API
+- Unique rule on category + month in the database itself
+- Only the limit can be updated; a new category or month means a new budget
+- Budgets only for EXPENSE categories
+
+Next:
+- Monthly report
