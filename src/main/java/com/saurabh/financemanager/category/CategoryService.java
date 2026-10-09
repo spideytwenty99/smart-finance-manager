@@ -1,5 +1,7 @@
 package com.saurabh.financemanager.category;
 
+import com.saurabh.financemanager.budget.BudgetRepository;
+import com.saurabh.financemanager.budget.BudgetService;
 import com.saurabh.financemanager.category.dto.CategoryRequest;
 import com.saurabh.financemanager.category.dto.CategoryResponse;
 import com.saurabh.financemanager.exception.DuplicateResourceException;
@@ -19,19 +21,21 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final TransactionRepository transactionRepository;
+    private final BudgetRepository budgetRepository;
 
-    public CategoryService(CategoryRepository categoryRepository, TransactionRepository transactionRepository) {
+    public CategoryService(CategoryRepository categoryRepository, TransactionRepository transactionRepository, BudgetRepository budgetRepository) {
         this.categoryRepository = categoryRepository;
-        this.transactionRepository=transactionRepository;
+        this.transactionRepository = transactionRepository;
+        this.budgetRepository = budgetRepository;
     }
 
 
     public CategoryResponse createCategory(CategoryRequest categoryRequest) {
 
-        String name=categoryRequest.getName().trim();
-        if (categoryRepository.existsByNameIgnoreCaseAndTransactionType(name, categoryRequest.getTransactionType())){
+        String name = categoryRequest.getName().trim();
+        if (categoryRepository.existsByNameIgnoreCaseAndTransactionType(name, categoryRequest.getTransactionType())) {
             throw new DuplicateResourceException(
-                    "Category '"+name+"' already exists for type "+categoryRequest.getTransactionType()
+                    "Category '" + name + "' already exists for type " + categoryRequest.getTransactionType()
             );
         }
 
@@ -63,13 +67,21 @@ public class CategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Category not found"));
 
-        long categoryUsage= transactionRepository.countByCategoryId(id);
+        long categoryUsage = transactionRepository.countByCategoryId(id);
 
-        if (categoryUsage>0){
+        long budgetUsage = budgetRepository.countByCategoryId(id);
+
+        if (categoryUsage > 0) {
             throw new ConflictException(
-                    "Category '" +category.getName() + "' is used by " + categoryUsage+ " transactions and cannot be delted"
+                    "Category '" + category.getName() + "' is used by " + categoryUsage + " transactions and cannot be deleted"
             );
         }
+        if (budgetUsage > 0) {
+            throw new ConflictException(
+                    "Category '" + category.getName() + "' is used by " + budgetUsage + " budgets and cannot be deleted"
+            );
+        }
+
 
         categoryRepository.delete(category);
     }
