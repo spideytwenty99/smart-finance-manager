@@ -119,3 +119,23 @@ Decisions:
 
 Next:
 - Monthly report
+
+## 2026-10-11: Monthly report
+
+Done:
+- Monthly report: total income, expenses, balance and spending per category
+- Budget status per category: OK, WARNING (80% or more), OVER_LIMIT, NOT_SET
+- Categories with a budget but no spending still appear with 0 spent
+- Uncategorized expenses shown as their own line
+- Defaults to the current month when no month is given
+
+Decisions:
+- Sums calculated in the database with GROUP BY instead of looping in Java
+- An empty month returns zeros, not a 404
+- BigDecimal compared with compareTo and divided with explicit rounding
+
+Fixed along the way:
+- SUM over no rows returns null; converted to zero before calculating
+
+Next:
+- Automatic categorization
