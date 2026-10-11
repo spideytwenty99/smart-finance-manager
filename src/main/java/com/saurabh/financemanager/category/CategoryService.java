@@ -11,6 +11,7 @@ import com.saurabh.financemanager.transaction.TransactionRepository;
 import com.saurabh.financemanager.transaction.TransactionType;
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,6 +43,8 @@ public class CategoryService {
         Category category = mapToEntity(categoryRequest);
         category.setName(name);
 
+        category.setKeywords(KeywordCleaner.clean(categoryRequest.getKeywords()));
+
         Category savedCategory = categoryRepository.save(category);
 
         return mapToDto(savedCategory);
@@ -64,8 +67,13 @@ public class CategoryService {
     }
 
     public void delete(UUID id) {
+
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Category with id " + id + " not found"));
+
+        if (category.isSystemCategory()) {
+            throw new ConflictException("Built-in category '" + category.getName() + "' can't be deleted");
+        }
 
         long categoryUsage = transactionRepository.countByCategoryId(id);
 
@@ -105,22 +113,37 @@ public class CategoryService {
         responseDto.setCreatedAt(category.getCreatedAt());
         responseDto.setUpdatedAt(category.getUpdatedAt());
         responseDto.setTransactionType(category.getTransactionType());
+        responseDto.setKeywords(category.getKeywords());
+        responseDto.setSystemCategory(category.isSystemCategory());
 
         return responseDto;
     }
 
 
-    public CategoryResponse update(UUID id, CategoryRequest categoryRequest) {
-        Category existingCategory = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+    @Transactional
+    public CategoryResponse update(UUID id, CategoryRequest request) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category with id " + id + " not found"));
 
-        existingCategory.setName(categoryRequest.getName());
-        existingCategory.setTransactionType(categoryRequest.getTransactionType());
+        String name = request.getName().trim();
+        boolean renamed = !category.getName().equalsIgnoreCase(name);
+        boolean transactionTypeChanged = category.getTransactionType() != request.getTransactionType();
 
+        if (category.isSystemCategory() && (renamed || transactionTypeChanged)) {
+            throw new ConflictException("Built-in category '" + category.getName()
+                    + "' can't be renamed or change its type, only its keywords can be edited");
+        }
 
-        Category updatedCategory = categoryRepository.save(existingCategory);
+        if ((renamed || transactionTypeChanged)
+                && categoryRepository.existsByNameIgnoreCaseAndTransactionType(name, request.getTransactionType())) {
+            throw new DuplicateResourceException(
+                    "Category '" + name + "' already exists for type " + request.getTransactionType());
+        }
 
-        return mapToDto(updatedCategory);
+        category.setName(name);
+        category.setTransactionType(request.getTransactionType());
+        category.setKeywords(KeywordCleaner.clean(request.getKeywords()));
 
+        return mapToDto(categoryRepository.save(category));
     }
 }

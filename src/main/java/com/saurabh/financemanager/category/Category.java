@@ -7,7 +7,6 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -18,18 +17,18 @@ import java.util.UUID;
 @AllArgsConstructor
 
 @Entity
-@Table(name="categories")
+@Table(name = "categories")
 public class Category {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Setter(AccessLevel.NONE)
     private UUID id;
 
-    @Column (nullable = false)
+    @Column(nullable = false)
     private String name;
 
     @CreationTimestamp
-    @Column(nullable = false,updatable = false)
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
@@ -41,8 +40,15 @@ public class Category {
     private TransactionType transactionType;
 
 
+    // First version for automatic categorization
+    @Column(length = 500)
+    private String keywords;
 
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean systemCategory;
 
+    @Column(unique = true, length = 50)
+    private String code;
 
 
 }

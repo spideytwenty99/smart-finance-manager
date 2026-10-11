@@ -1,5 +1,7 @@
 package com.saurabh.financemanager.transaction;
 
+import com.saurabh.financemanager.category.BuiltInCategoryInitializer;
+import com.saurabh.financemanager.category.CategorizationService;
 import com.saurabh.financemanager.category.Category;
 import com.saurabh.financemanager.category.CategoryRepository;
 import com.saurabh.financemanager.exception.ResourceNotFoundException;
@@ -13,30 +15,33 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class TransactionService {
 
-    private TransactionRepository transactionRepository;
-    private CategoryRepository categoryRepository;
+    private record CategoryChoice(Category category,boolean autoCategorized){}
 
-    public TransactionService(TransactionRepository transactionRepository, CategoryRepository categoryRepository) {
+    private final TransactionRepository transactionRepository;
+    private final CategoryRepository categoryRepository;
+    private final CategorizationService categorizationService;
+
+    public TransactionService(TransactionRepository transactionRepository, CategoryRepository categoryRepository,CategorizationService categorizationService) {
         this.transactionRepository = transactionRepository;
         this.categoryRepository = categoryRepository;
+        this.categorizationService=categorizationService;
     }
 
     //Create Transaction
     @Transactional
     public TransactionResponse createTransaction(TransactionRequest request) {
-        Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Category with id " + request.getCategoryId() + "not found"));
+        CategoryChoice choice = chooseCategory(request);
 
-        Transaction transaction = mapToEntity(request, category);
+        Transaction transaction = mapToEntity(request, choice.category());
+        transaction.setAutoCategorized(choice.autoCategorized());
 
-        Transaction savedTransaction = transactionRepository.save(transaction);
-
-        return mapToDto(savedTransaction);
+        return mapToDto(transactionRepository.save(transaction));
 
     }
 
@@ -47,13 +52,13 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction  with id " + id + " not found"));
 
-        Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Category with id " + request.getCategoryId() + "not found"));
+        CategoryChoice choice = chooseCategory(request);
 
         transaction.setAmount(request.getAmount());
         transaction.setDescription(request.getDescription());
         transaction.setTransactionDate(request.getTransactionDate());
-        transaction.setCategory(category);
+        transaction.setCategory(choice.category());
+        transaction.setAutoCategorized(choice.autoCategorized());
 
         Transaction savedTransaction = transactionRepository.save(transaction);
 
@@ -125,9 +130,10 @@ public class TransactionService {
         response.setDescription(transaction.getDescription());
         response.setTransactionDate(transaction.getTransactionDate());
 
-        response.setCategoryID(transaction.getCategory().getId());
+        response.setCategoryId(transaction.getCategory().getId());
         response.setCategoryName(transaction.getCategory().getName());
         response.setTransactionType(transaction.getCategory().getTransactionType());
+        response.setAutoCategorized(transaction.isAutoCategorized());
 
 
         response.setCreatedAt(transaction.getCreatedAt());
@@ -137,6 +143,43 @@ public class TransactionService {
 
 
     }
+
+    //Decision-making for category
+    private CategoryChoice chooseCategory(TransactionRequest request) {
+        UUID categoryId = request.getCategoryId();
+        TransactionType type = request.getTransactionType();
+
+        // 1. The user picked a category: always respect it
+        if (categoryId != null) {
+            Category category = categoryRepository.findById(categoryId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Category with id " + categoryId + " not found"));
+            if (type != null && type != category.getTransactionType()) {
+                throw new IllegalArgumentException("Category '" + category.getName() + "' is "
+                        + category.getTransactionType() + ", but the transaction type is " + type);
+            }
+            return new CategoryChoice(category, false);
+        }
+
+        // 2. No category and no type: we can't tell income from expense
+        if (type == null) {
+            throw new IllegalArgumentException("Either categoryId or transactionType is required");
+        }
+
+        // 3. Let the rules try
+        Optional<Category> match = categorizationService.categorize(request.getDescription(), type);
+        if (match.isPresent()) {
+            return new CategoryChoice(match.get(), true);
+        }
+
+        // 4. Nothing matched: Uncategorized for this type
+        String code = (type == TransactionType.EXPENSE)
+                ? BuiltInCategoryInitializer.UNCATEGORIZED_EXPENSE
+                : BuiltInCategoryInitializer.UNCATEGORIZED_INCOME;
+        Category fallback = categoryRepository.findByCode(code)
+                .orElseThrow(() -> new IllegalStateException("Built-in category " + code + " is missing"));
+        return new CategoryChoice(fallback, false);
+    }
+
 
     //Maps to the entity
     private Transaction mapToEntity(TransactionRequest request, Category category) {

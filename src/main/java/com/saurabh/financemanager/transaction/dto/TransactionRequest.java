@@ -28,6 +28,7 @@ public class TransactionRequest {
     @PastOrPresent(message = "Transaction date cannot be in the future")
     private LocalDate transactionDate;
 
-    @NotNull(message = "Category ID is required")
     private UUID categoryId;
+
+    private TransactionType transactionType;
 }

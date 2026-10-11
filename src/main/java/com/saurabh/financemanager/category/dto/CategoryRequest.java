@@ -15,11 +15,15 @@ import lombok.Setter;
 @NoArgsConstructor
 public class CategoryRequest {
 
-    @NotBlank(message="Category name is required")
-    @Size(max=50, message = "Category name must be at most 50 characters")
+    @NotBlank(message = "Category name is required")
+    @Size(max = 50, message = "Category name must be at most 50 characters")
     private String name;
 
     @NotNull(message = "Transaction type is required")
     private TransactionType transactionType;
+
+    //For category created by user to teach the app it's keywords
+    @Size(max = 500, message = "Keywords must be at most 500 characters")
+    private String keywords;
 
 }

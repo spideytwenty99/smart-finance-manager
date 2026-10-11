@@ -20,9 +20,11 @@ public class TransactionResponse {
     private LocalDate transactionDate;
 
 
-    private UUID categoryID;
+    private UUID categoryId;
     private String categoryName;
     private TransactionType transactionType;
+
+    private boolean autoCategorized;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

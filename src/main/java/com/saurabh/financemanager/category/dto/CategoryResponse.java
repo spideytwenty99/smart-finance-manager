@@ -2,7 +2,7 @@ package com.saurabh.financemanager.category.dto;
 
 
 import com.saurabh.financemanager.transaction.TransactionType;
-import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -22,5 +22,8 @@ public class CategoryResponse {
     private LocalDateTime updatedAt;
 
     private TransactionType transactionType;
+
+    private String keywords;
+    private boolean systemCategory;
 
 }

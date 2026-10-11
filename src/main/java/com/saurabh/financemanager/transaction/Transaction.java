@@ -5,6 +5,7 @@ import com.saurabh.financemanager.category.Category;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -17,6 +18,7 @@ import java.util.UUID;
 
 @Getter
 @Setter
+@NoArgsConstructor
 @Entity
 @Table(name = "transactions")
 public class Transaction {
@@ -28,7 +30,7 @@ public class Transaction {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
 
-    @Column(length = 25)
+    @Column(length = 255)
     private String description;
 
     @Column(nullable = false)
@@ -46,5 +48,8 @@ public class Transaction {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean autoCategorized;
 
 }
