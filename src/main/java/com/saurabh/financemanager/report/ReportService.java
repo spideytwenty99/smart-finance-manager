@@ -36,8 +36,8 @@ public class ReportService {
         LocalDate start = month.atDay(1);
         LocalDate end = month.atEndOfMonth();
 
-        BigDecimal totalIncome = transactionRepository.sumByType(start, end, TransactionType.INCOME);
-        BigDecimal totalExpense = transactionRepository.sumByType(start, end, TransactionType.EXPENSE);
+        BigDecimal totalIncome = zeroIfNull(transactionRepository.sumByType(start, end, TransactionType.INCOME));
+        BigDecimal totalExpense =zeroIfNull( transactionRepository.sumByType(start, end, TransactionType.EXPENSE));
         BigDecimal balance = totalIncome.subtract(totalExpense);
 
         List<TotalByCategory> totals = transactionRepository.totalPerCategory(start, end, TransactionType.EXPENSE);
@@ -102,5 +102,9 @@ public class ReportService {
     private BigDecimal calculatePercentage(BigDecimal spent, BigDecimal limit) {
         return spent.multiply(BigDecimal.valueOf(100))
                 .divide(limit, 2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }
