@@ -170,3 +170,83 @@ Next:
 
 - User accounts and login.
 - Unit tests for the categorization logic.g
+
+## 2026-10-11 — API documentation with Swagger
+
+I planned to start on user accounts next, but did Swagger first. It's a small step,
+makes the whole API easy to try in the browser, and the login button for JWT will
+go on the same page later.
+
+**What I built**
+
+- Added springdoc-openapi (3.x, for Spring Boot 4). The app now generates an
+  OpenAPI description of the API automatically from the controllers and DTOs.
+- Swagger UI at `/swagger-ui.html` lists every endpoint and lets you send real
+  requests from the browser. The raw OpenAPI JSON is at `/v3/api-docs`.
+- An `OpenApiConfig` class with the API title, description, version and a link
+  to the GitHub repo.
+
+**Notes**
+
+- Requests sent from Swagger are real and change the database, just like Postman.
+- The API has no authentication yet, so it's meant for local use only until
+  login is added.
+
+**Known issues**
+
+- Status codes decided inside the method (201 on create, 204 on delete) and the
+  error responses (400, 404, 409) aren't documented yet, so Swagger shows them as
+  "Undocumented".
+- Example request bodies are still generic placeholders.
+
+**Next**
+
+-JUnit, Mockito @MockMvc
+
+## 2026-10-12 — Tests
+
+**What I built**
+
+- Unit tests with JUnit and Mockito for the services that hold the business logic:
+  - CategorizationService: matching, case-insensitivity, longest keyword wins,
+    no match, expenses never land in income categories, short keywords rejected,
+    categories without keywords never match.
+  - ReportService: totals and balance, the status boundaries (exactly 80% is
+    WARNING, exactly 100% is not OVER, anything above is OVER), budgets with no
+    spending, uncategorized expenses, empty months, null sums, sorting.
+  - BudgetService: duplicate budgets, income categories, update changes only the limit.
+  - TransactionService: chosen category, unknown category, type mismatch, rules
+    only run when no category is given, and the month filter uses exactly the first
+    and last day of the month.
+- A controller test with MockMvc for TransactionController: valid POST gives 201,
+  invalid body gives 400 with field errors, missing id gives 404 in the
+  ErrorResponse shape, and an invalid month gives 400.
+
+**Bugs found by tests**
+
+- `shouldNotCrashWhenSumsAreNull` failed with a NullPointerException: ReportService
+  called `subtract` on a sum that can be null. COALESCE in the query was hiding it.
+  Fixed with a small `zeroIfNull` helper, so the service no longer depends on the query.
+- `shouldReturn400ForInvalidMonth` showed that `month=October` returned 500.
+  GlobalExceptionHandler had no handler for MethodArgumentTypeMismatchException,
+  so it fell into the catch-all. Added a 400 handler, which also fixes bad UUIDs
+  and enum values everywhere in the API.
+- The controller tests first failed with 401/403 on every request, because
+  spring-boot-starter-security-test pulled Spring Security into the tests.
+  Removed it until login is built.
+
+**Decisions**
+
+- Tested where the logic and boundaries are, not every class. The other
+  controllers use the same validation and error handling that
+  TransactionControllerTest already covers.
+
+**Known issues**
+
+- CategoryService has no tests yet (keyword cleanup, built-in protection,
+  duplicate check on update, delete rules).
+
+**Next**
+
+- Finish Swagger: endpoint descriptions, documented status codes and example values.
+- User accounts and login.
