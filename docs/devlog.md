@@ -139,3 +139,34 @@ Fixed along the way:
 
 Next:
 - Automatic categorization
+
+## 2026-10-11 — Built-in categories and automatic categorization
+
+**What I built**
+
+- The app now ships with built-in categories (Groceries, Transport, Rent, Salary
+  and more), each with keywords, plus an "Uncategorized" category per type.
+  A seeder creates them at startup and adopts matching categories I already had.
+- Transactions without a category are categorized automatically by matching the
+  description against keywords of the same type. The longest matching keyword wins;
+  if nothing matches, the transaction goes to Uncategorized.
+- An `autoCategorized` flag shows which categories were guessed and which were
+  chosen by the user.
+
+**Key decisions** (full list in design.md)
+
+- Every transaction always has a category, so the type still comes from the
+  category and the report didn't need to change.
+- The user's choice always wins; the rules only run when no category is sent.
+- Built-ins are protected and found by a fixed code, never by a hardcoded id.
+
+**Known issues**
+
+- My old FOOD category overlaps with Groceries.
+- Substring matching can still give false matches for keywords of 3+ letters.
+- Still single-user.
+
+**Next**
+
+- User accounts and login.
+- Unit tests for the categorization logic.g
