@@ -1,119 +1,101 @@
 # Smart Finance Manager
 
-A personal finance REST API for tracking income and expenses, organizing transactions into categories, setting monthly budgets, and seeing where your money goes.
+![CI](https://github.com/spideytwenty99/smart-finance-manager/actions/workflows/ci.yml/badge.svg)
 
-Built with Java 21, Spring Boot and PostgreSQL.
-
-> **Status:** In active development. The first version is single-user; authentication and multi-user support are planned for a later version.
+A REST API for personal finance: track income and expenses, set monthly budgets per category, and get a monthly report showing where your money went. Transactions without a category are categorized automatically from their description.
 
 ## Features
 
-Planned for version 1:
-
-- Add, view, update and delete income and expense transactions
-- Filter transactions by date range, category and type
-- Default categories (Food, Rent, Transport, Shopping, Entertainment, Salary) plus custom categories
-- Monthly budgets per category with usage tracking
-- Dashboard with total income, expenses, balance and spending by category
-- Input validation and consistent error responses
-
-Planned for later versions:
-
-- User registration and login with Spring Security and JWT
-- Database migrations with Flyway
-- Docker setup and CI with GitHub Actions
-- Recurring transactions, savings goals and CSV import
-- AI-based transaction categorization
+- **Transactions**: create, update, delete and list, filtered by month, date range or category
+- **Automatic categorization**: "REWE Frankfurt Hbf" lands in Groceries by itself; the longest matching keyword wins, and a category chosen by the user is never overridden
+- **Built-in categories**: a starter set with German-relevant keywords, plus your own categories
+- **Monthly budgets**: one spending limit per expense category and month
+- **Monthly report**: income, expenses, balance, and per category how much of the budget is used (OK, WARNING from 80%, OVER_LIMIT above 100%)
+- **Consistent errors**: every error has the same JSON shape, with field-level messages for validation errors
+- **API documentation**: OpenAPI with Swagger UI
+- **Tests**: unit and controller tests, run on every push with GitHub Actions
 
 ## Tech Stack
 
-- Java 21
-- Spring Boot (Spring Web, Spring Data JPA, Validation)
-- PostgreSQL
-- Hibernate
-- Lombok
-- Maven
-- JUnit 5 and Mockito
+- Java 21, Spring Boot 4
+- Spring Web, Spring Data JPA (Hibernate), Bean Validation
+- PostgreSQL 17
+- springdoc-openapi (Swagger UI)
+- JUnit 5, Mockito, MockMvc
+- Docker, Docker Compose, GitHub Actions
+- Maven, Lombok
 
-## Getting Started
+## Quick Start
 
-### Prerequisites
-
-- Java 21
-- PostgreSQL running locally
-
-### 1. Clone the repository
+You only need [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/smart-finance-manager.git
+git clone https://github.com/spideytwenty99/smart-finance-manager.git
 cd smart-finance-manager
+cp .env.example .env        # on Windows PowerShell: copy .env.example .env
+docker compose up --build
 ```
 
-### 2. Create the database
+Then open Swagger UI at **http://localhost:8080/swagger-ui.html**.
 
-```sql
-CREATE DATABASE smart_finance;
+![Swagger UI](docs/images/swagger-ui.png)
+
+The app starts with the built-in categories already in place. Try `POST /api/transactions` with:
+
+```json
+{
+  "amount": 12.50,
+  "description": "REWE Frankfurt Hbf",
+  "transactionDate": "2026-10-05",
+  "transactionType": "EXPENSE"
+}
 ```
 
-### 3. Set environment variables
+The response shows the category Groceries with `"autoCategorized": true`.
 
-The database password is read from an environment variable so it is never stored in the repository.
+## Running the Tests
 
-```
-DB_USERNAME=postgres
-DB_PASSWORD=your_password
-```
-
-### 4. Run the application
+The tests include one that starts the whole application, so the database container needs to be running:
 
 ```bash
-./mvnw spring-boot:run
-```
-
-On Windows:
-
-```bash
-mvnw.cmd spring-boot:run
-```
-
-The API runs at `http://localhost:8080/api/v1`.
-
-### Run the tests
-
-```bash
+docker compose up -d db
 ./mvnw test
 ```
 
+Set `DB_USERNAME` and `DB_PASSWORD` to the values from your `.env` first. The same tests run automatically on GitHub for every push.
+
+## Running from an IDE
+
+Start only the database with `docker compose up -d db`, set the environment variables `DB_USERNAME` and `DB_PASSWORD` to the values from `.env`, and run `SmartFinanceManagerApplication`. The database is reachable on port 5433, so it doesn't clash with a local PostgreSQL on 5432.
+
 ## Documentation
 
-Design documents are in the [`docs`](docs) folder:
-
+- [OpenAPI specification](docs/api/openapi.json) — import it into Postman, or paste it into [editor.swagger.io](https://editor.swagger.io)
 - [Requirements](docs/requirements.md)
 - [Architecture](docs/architecture.md)
 - [Database Design](docs/database-design.md)
 - [API Design](docs/api-design.md)
-- [OpenAPI specification](docs/api/openapi.json) — the full API description.
-    Import it into Postman (File → Import), or paste it into
-    [editor.swagger.io](https://editor.swagger.io) to browse the API without running the app.
-- - Swagger UI at `http://localhost:8080/swagger-ui.html` when the app is running.
+- [Devlog](docs/devlog.md) — what was built when, and the decisions behind it
 
 ## Project Structure
 
-The code is organized by feature:
+Organized by feature:
 
 ```
 com.saurabh.financemanager
-├── category
-├── transaction
-├── budget
-├── dashboard
-├── config
-└── common
+├── category      categories, built-in seeding, automatic categorization
+├── transaction   transactions
+├── budget        monthly budgets
+├── report        monthly report
+├── exception     error handling
+└── config        OpenAPI configuration
 ```
 
-Each feature package contains its own entity, repository, service, controller and DTOs.
+## Next
 
-
+- User accounts and login with Spring Security and JWT
+- A small React frontend with a dashboard, transactions and budgets
+- Machine learning for categorization, trained on corrected guesses
 
 ## Author
 
