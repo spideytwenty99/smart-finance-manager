@@ -250,3 +250,52 @@ go on the same page later.
 
 - Finish Swagger: endpoint descriptions, documented status codes and example values.
 - User accounts and login.
+
+## 2026-10-12 — API documentation
+
+**What I built**
+
+- Every controller has a tag with a one-line description, and every endpoint has a
+  summary. Endpoints with rules people can't guess also explain them, e.g. how
+  automatic categorization works, why a category can't be deleted, and when a
+  budget counts as WARNING or OVER_LIMIT.
+- Every path and query parameter is described, with examples for dates and months.
+- Each endpoint lists exactly the status codes it can return, with the reason, and
+  error responses show the ErrorResponse shape with real example bodies.
+- Every DTO field has a description and a realistic example; required fields and
+  limits come from the validation annotations.
+- Exported the spec to `docs/api/openapi.json` and linked it in the README, so the
+  API can be browsed without running the app.
+
+**Decisions**
+
+- Turned off springdoc's automatic error responses
+  (`springdoc.override-with-generic-response=false`). Otherwise it reads the
+  GlobalExceptionHandler and claims every endpoint can return every error, even
+  404 and 409 on "list all".
+- Documented what the code really does, not what I first planned. Deleting a
+  category that's still in use returns 409, not 400.
+- Months are documented as strings ("2026-10"), and timestamps as local date-time
+  without a time zone, because that's what the API actually sends.
+
+**Found along the way**
+
+- Several bad requests returned 500 instead of the documented 400, because
+  GlobalExceptionHandler had no handlers for missing parameters,
+  IllegalArgumentException (rule violations like a type mismatch) and unreadable
+  bodies (broken JSON, unknown enum values). Added all three.
+- editor.swagger.io flagged the timestamp examples, because LocalDateTime has no
+  time zone but was labelled as a standard date-time. Fixed the label.
+
+**Known issues**
+
+- Timestamps have no time zone; switching to OffsetDateTime or Instant would fix it.
+- The exported spec is a snapshot and has to be re-exported after API changes.
+- The editor warns that `example` is the older OpenAPI style; harmless.
+
+**Next**
+
+- I'd planned user accounts and login next, but decided to set up Docker,
+  GitHub Actions and an updated README first. Login touches almost every part
+  of the app, so I want CI running the tests on every push before I start it.
+- Then user accounts and login.
