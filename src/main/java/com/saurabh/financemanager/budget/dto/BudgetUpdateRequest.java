@@ -1,5 +1,6 @@
 package com.saurabh.financemanager.budget.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -14,6 +15,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 public class BudgetUpdateRequest {
 
+    @Schema(description = "New spending limit in euros", example = "350.00")
     @NotNull(message = "Amount limit is required")
     @Positive(message = "Amount limit must be greater than zero")
     @Digits(integer = 17, fraction = 2, message = "Amount limit can have at most two decimal places")
