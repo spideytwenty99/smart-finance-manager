@@ -299,3 +299,46 @@ go on the same page later.
   GitHub Actions and an updated README first. Login touches almost every part
   of the app, so I want CI running the tests on every push before I start it.
 - Then user accounts and login.
+
+## 2026-10-12 — Docker, GitHub Actions and README
+
+**What I built**
+
+- PostgreSQL 17 runs in a Docker container, with a health check and a volume so the
+  data survives restarts. Credentials come from `.env`, which is ignored by Git;
+  `.env.example` shows the keys.
+- A multi-stage Dockerfile for the app: a Maven + JDK image builds the jar, and a
+  slim JRE image runs it as a non-root user. The final image is about 130 MB
+  compressed.
+- `docker compose up --build` starts the database and the app together. The app
+  waits until the database is healthy.
+- GitHub Actions runs `./mvnw verify` on every push, with a throwaway PostgreSQL
+  service for the test that starts the whole application. The first run passed.
+- Rewrote the README: CI badge, features, tech stack, a four-command quick start
+  with Docker, a Swagger screenshot and an example request.
+
+**Decisions**
+
+- The container's database is on port 5433, so it doesn't clash with my local
+  PostgreSQL on 5432.
+- Inside Docker, the app reaches the database by its service name (`db:5432`), not
+  `localhost`, because `localhost` inside a container means the container itself.
+  An environment variable overrides the URL, so the same code runs from IntelliJ
+  and from Docker without changes.
+- Dependencies are downloaded in their own layer before the source is copied, so
+  rebuilds after a code change take seconds.
+- Tests are skipped in the Docker build, because GitHub Actions runs them.
+- Started with a fresh database in the container instead of migrating my old test
+  data.
+
+**Known issues**
+
+- Running the tests locally needs the database container and the DB environment
+  variables set.
+- Hibernate still creates the tables (`ddl-auto=update`); there are no database
+  migrations yet.
+- The image is built locally and not published to a registry.
+
+**Next**
+
+- User accounts and login with Spring Security and JWT.
