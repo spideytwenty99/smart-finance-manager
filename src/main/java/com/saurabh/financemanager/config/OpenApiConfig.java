@@ -17,7 +17,7 @@ public class OpenApiConfig {
                         .description("Track income and expenses, set monthly budgets per category, "
                                 + "and get a monthly report with budget status. "
                                 + "Transactions without a category are categorized automatically from their description.")
-                        .version("0.1.0")
+                        .version("1.0.0")
                         .contact(new Contact()
                                 .name("Saurabh")
                                 .url("https://github.com/spideytwenty99/smart-finance-manager")));
