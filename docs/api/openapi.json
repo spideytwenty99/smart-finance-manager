@@ -1,0 +1,1207 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "Smart Finance Manager API",
+    "description" : "Track income and expenses, set monthly budgets per category, and get a monthly report with budget status. Transactions without a category are categorized automatically from their description.",
+    "contact" : {
+      "name" : "Saurabh",
+      "url" : "https://github.com/spideytwenty99/smart-finance-manager"
+    },
+    "version" : "0.1.0"
+  },
+  "servers" : [ {
+    "url" : "http://localhost:8080",
+    "description" : "Generated server url"
+  } ],
+  "tags" : [ {
+    "name" : "Categories",
+    "description" : "Income and expense categories, including built-in ones with keywords for automatic categorization."
+  }, {
+    "name" : "Reports",
+    "description" : "Monthly summary of income, expenses and spending against budgets."
+  }, {
+    "name" : "Transactions",
+    "description" : "Income and expense entries; categorized automatically when no category is given."
+  }, {
+    "name" : "Budgets",
+    "description" : "Monthly spending limits per expense category."
+  } ],
+  "paths" : {
+    "/api/transactions/{id}" : {
+      "get" : {
+        "tags" : [ "Transactions" ],
+        "summary" : "Get a transaction by id",
+        "operationId" : "getTransaction",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID of the transaction",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Transaction found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TransactionResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The id is not a valid UUID",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No transaction with this id",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "Transactions" ],
+        "summary" : "Update a transaction",
+        "description" : "Replaces all fields. The same category rules as on create apply. Sending your own categoryId for a guessed transaction sets autoCategorized to false.",
+        "operationId" : "updateTransaction",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID of the transaction",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TransactionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Transaction updated",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TransactionResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid input, neither categoryId nor transactionType given, or type doesn't match the category",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No transaction with this id, or no category with the given categoryId",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Transactions" ],
+        "summary" : "Delete a transaction",
+        "operationId" : "deleteTransaction",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID of the transaction",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Transaction deleted"
+          },
+          "400" : {
+            "description" : "The id is not a valid UUID",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No transaction with this id",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/category/{id}" : {
+      "get" : {
+        "tags" : [ "Categories" ],
+        "summary" : "Get a category by id",
+        "operationId" : "getCategory",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID of the category",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Category found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CategoryResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The id is not a valid UUID",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No category with this id",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "Categories" ],
+        "summary" : "Update a category",
+        "description" : "Built-in categories can't be renamed or change their type; only their keywords can be edited. Keywords are cleaned the same way as on create.",
+        "operationId" : "update",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID of the category",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CategoryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Category updated",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CategoryResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid input, or a keyword shorter than 3 letters",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No category with this id",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Name already taken, or a built-in category would be renamed or retyped",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Categories" ],
+        "summary" : "Delete a category",
+        "description" : "Refused for built-in categories, and for any category still used by a transaction or a budget.",
+        "operationId" : "deleteCategory",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID of the category",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Category deleted"
+          },
+          "400" : {
+            "description" : "The id is not a valid UUID",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No category with this id",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Built-in category, or still used by transactions or budgets",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/budgets/{id}" : {
+      "get" : {
+        "tags" : [ "Budgets" ],
+        "summary" : "Get a budget by id",
+        "operationId" : "getBudget",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID of the budget",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Budget found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BudgetResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The id is not a valid UUID",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No budget with this id",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "Budgets" ],
+        "summary" : "Update a budget's limit",
+        "description" : "Only the limit can change. To use a different category or month, delete this budget and create a new one.",
+        "operationId" : "updateBudget",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID of the budget",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BudgetUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Budget updated",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BudgetResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid limit",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No budget with this id",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "Budgets" ],
+        "summary" : "Delete a budget",
+        "description" : "Transactions are not affected.",
+        "operationId" : "deleteBudget",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID of the budget",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Budget deleted"
+          },
+          "400" : {
+            "description" : "The id is not a valid UUID",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No budget with this id",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transactions" : {
+      "get" : {
+        "tags" : [ "Transactions" ],
+        "summary" : "List transactions",
+        "description" : "Without filters, returns all transactions. Filter by month, or by startDate and endDate together, but not both. Can be combined with categoryId.",
+        "operationId" : "getTransactions",
+        "parameters" : [ {
+          "name" : "startDate",
+          "in" : "query",
+          "description" : "Start of a date range, inclusive. Must be sent together with endDate.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "example" : "2026-10-01"
+        }, {
+          "name" : "endDate",
+          "in" : "query",
+          "description" : "End of a date range, inclusive. Must be sent together with startDate.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "example" : "2026-10-31"
+        }, {
+          "name" : "month",
+          "in" : "query",
+          "description" : "Month in the format YYYY-MM. Can't be combined with startDate and endDate.",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          },
+          "example" : "2026-10"
+        }, {
+          "name" : "categoryId",
+          "in" : "query",
+          "description" : "Optional filter: only transactions in this category.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "List of transactions, possibly empty",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/TransactionResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad date or month format, or an invalid combination of filters",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Transactions" ],
+        "summary" : "Create a transaction",
+        "description" : "Send either a categoryId or a transactionType. If a categoryId is given, it is always used and never overridden. Without one, the category is chosen from keywords in the description among categories of the same type; the longest matching keyword wins, and if nothing matches the transaction goes to Uncategorized. If both are sent, the type must match the category's type. autoCategorized in the response is true when the rules chose the category. The date can't be in the future.",
+        "operationId" : "createTransaction",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TransactionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Transaction created",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TransactionResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid input, neither categoryId nor transactionType given, or type doesn't match the category",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No category with the given categoryId",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/category" : {
+      "get" : {
+        "tags" : [ "Categories" ],
+        "summary" : "List categories",
+        "description" : "Returns all categories, including the built-in ones. Optionally filter by type.",
+        "operationId" : "getAllCategories",
+        "parameters" : [ {
+          "name" : "type",
+          "in" : "query",
+          "description" : "Optional filter: only categories of this type. Without it, all categories are returned.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "INCOME", "EXPENSE" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "List of categories, possibly empty",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CategoryResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Unknown type value",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Categories" ],
+        "summary" : "Create a category",
+        "description" : "Names must be unique per type, ignoring upper and lower case. Keywords are optional and used for automatic categorization; they are saved lowercase and trimmed, duplicates are removed, and each keyword needs at least 3 letters.",
+        "operationId" : "createCategory",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CategoryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Category created",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CategoryResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid input, or a keyword shorter than 3 letters",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "A category with this name and type already exists",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/budgets" : {
+      "get" : {
+        "tags" : [ "Budgets" ],
+        "summary" : "List budgets for a month",
+        "description" : "The month is required.",
+        "operationId" : "getBudgetsForMonth",
+        "parameters" : [ {
+          "name" : "month",
+          "in" : "query",
+          "description" : "Month in the format YYYY-MM. Required.",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          },
+          "example" : "2026-10"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "List of budgets, possibly empty",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/BudgetResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Month missing or not in the format YYYY-MM",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Budgets" ],
+        "summary" : "Create a budget",
+        "description" : "Only for expense categories. Each category can have one budget per month.",
+        "operationId" : "createBudget",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BudgetRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Budget created",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BudgetResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid input, or the category is an income category",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "No category with the given categoryId",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "This category already has a budget for this month",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports" : {
+      "get" : {
+        "tags" : [ "Reports" ],
+        "summary" : "Get the monthly report",
+        "description" : "Defaults to the current month, using the server's time zone. Shows total income, total expenses, balance, and one line per expense category, sorted by spending. Budget status is OK below 80%, WARNING from 80% up to and including 100%, and OVER_LIMIT above 100%. Categories without a budget show NOT_SET. Budgets with no spending still appear with 0 spent.",
+        "operationId" : "getMonthlyReport",
+        "parameters" : [ {
+          "name" : "month",
+          "in" : "query",
+          "description" : "Month in the format YYYY-MM. Optional; without it, the current month is used.",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          },
+          "example" : "2026-10"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The report for the month",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MonthlySummary"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Month not in the format YYYY-MM",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "TransactionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number",
+            "description" : "Amount in euros, always positive; the category's type decides income or expense",
+            "example" : 12.5,
+            "minimum" : 0
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "What the transaction was for; used for automatic categorization",
+            "example" : "REWE Frankfurt Hbf",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "transactionDate" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "Date of the transaction; can't be in the future",
+            "example" : "2026-10-05"
+          },
+          "categoryId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Optional. If given, this category is always used. Leave it out to categorize automatically."
+          },
+          "transactionType" : {
+            "type" : "string",
+            "description" : "Required when no categoryId is given. If both are sent, it must match the category's type.",
+            "enum" : [ "INCOME", "EXPENSE" ],
+            "example" : "EXPENSE"
+          }
+        },
+        "required" : [ "amount", "transactionDate" ]
+      },
+      "ErrorResponse" : {
+        "type" : "object",
+        "properties" : {
+          "timeStamp" : {
+            "type" : "string",
+            "description" : "When the error happened",
+            "example" : "2026-10-12T09:30:12.481"
+          },
+          "status" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "HTTP status code",
+            "example" : 400
+          },
+          "error" : {
+            "type" : "string",
+            "description" : "Short name of the status",
+            "example" : "Bad Request"
+          },
+          "message" : {
+            "type" : "string",
+            "description" : "What went wrong",
+            "example" : "Validation failed"
+          },
+          "path" : {
+            "type" : "string",
+            "description" : "The path that was called",
+            "example" : "/api/category"
+          },
+          "validationErrors" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Field name to problem, for validation errors; empty otherwise",
+            "example" : {
+              "name" : "Category name is required"
+            }
+          }
+        }
+      },
+      "TransactionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID of the transaction",
+            "example" : "1560751e-33a0-4f25-b9c1-b8916e85c08e",
+            "readOnly" : true
+          },
+          "amount" : {
+            "type" : "number",
+            "description" : "Amount in euros",
+            "example" : 12.5
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "What the transaction was for",
+            "example" : "REWE Frankfurt Hbf"
+          },
+          "transactionDate" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "Date of the transaction",
+            "example" : "2026-10-05"
+          },
+          "categoryId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID of the transaction's category",
+            "example" : "55d802f4-e571-4819-b89a-1f4edecedb9c"
+          },
+          "categoryName" : {
+            "type" : "string",
+            "description" : "Name of the transaction's category",
+            "example" : "Groceries"
+          },
+          "transactionType" : {
+            "type" : "string",
+            "description" : "Income or expense, taken from the category",
+            "enum" : [ "INCOME", "EXPENSE" ],
+            "example" : "EXPENSE"
+          },
+          "autoCategorized" : {
+            "type" : "boolean",
+            "description" : "True when the category was chosen automatically from keywords",
+            "example" : true
+          },
+          "createdAt" : {
+            "type" : "string",
+            "description" : "When the transaction was created",
+            "example" : "2026-10-05T18:30:00"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "description" : "When the transaction was last changed",
+            "example" : "2026-10-05T18:30:00"
+          }
+        }
+      },
+      "CategoryRequest" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "description" : "Name of the category, unique per type",
+            "example" : "Groceries",
+            "maxLength" : 50,
+            "minLength" : 0
+          },
+          "transactionType" : {
+            "type" : "string",
+            "description" : "Whether this is an income or an expense category",
+            "enum" : [ "INCOME", "EXPENSE" ],
+            "example" : "EXPENSE"
+          },
+          "keywords" : {
+            "type" : "string",
+            "description" : "Optional comma-separated keywords for automatic categorization; each needs at least 3 letters",
+            "example" : "rewe,lidl,aldi",
+            "maxLength" : 500,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "name", "transactionType" ]
+      },
+      "CategoryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID of the category",
+            "example" : "55d802f4-e571-4819-b89a-1f4edecedb9c",
+            "readOnly" : true
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Name of the category",
+            "example" : "Groceries"
+          },
+          "transactionType" : {
+            "type" : "string",
+            "description" : "Income or expense",
+            "enum" : [ "INCOME", "EXPENSE" ],
+            "example" : "EXPENSE"
+          },
+          "keywords" : {
+            "type" : "string",
+            "description" : "Cleaned keywords used for automatic categorization",
+            "example" : "rewe,lidl,aldi"
+          },
+          "systemCategory" : {
+            "type" : "boolean",
+            "description" : "True for built-in categories, which can't be renamed or deleted",
+            "example" : true
+          },
+          "createdAt" : {
+            "type" : "string",
+            "description" : "When the category was created",
+            "example" : "2026-10-05T20:42:45"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "description" : "When the category was last changed",
+            "example" : "2026-10-11T13:18:08"
+          }
+        }
+      },
+      "BudgetUpdateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "amountLimit" : {
+            "type" : "number",
+            "description" : "New spending limit in euros",
+            "example" : 350.0,
+            "minimum" : 0
+          }
+        },
+        "required" : [ "amountLimit" ]
+      },
+      "BudgetResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID of the budget",
+            "example" : "a3c1e7d2-5b4f-4c8e-9a1d-2f6b7c8d9e0f",
+            "readOnly" : true
+          },
+          "categoryId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID of the budget's category",
+            "example" : "55d802f4-e571-4819-b89a-1f4edecedb9c"
+          },
+          "categoryName" : {
+            "type" : "string",
+            "description" : "Name of the budget's category",
+            "example" : "Groceries"
+          },
+          "month" : {
+            "type" : "string",
+            "description" : "Month of the budget",
+            "example" : "2026-10"
+          },
+          "amountLimit" : {
+            "type" : "number",
+            "description" : "Spending limit in euros",
+            "example" : 300.0
+          },
+          "createdAt" : {
+            "type" : "string",
+            "description" : "When the budget was created",
+            "example" : "2026-10-09T09:56:00"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "description" : "When the budget was last changed",
+            "example" : "2026-10-09T10:03:00"
+          }
+        }
+      },
+      "BudgetRequest" : {
+        "type" : "object",
+        "properties" : {
+          "categoryId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID of an expense category"
+          },
+          "month" : {
+            "type" : "string",
+            "description" : "Month of the budget in the format YYYY-MM",
+            "example" : "2026-10"
+          },
+          "amountLimit" : {
+            "type" : "number",
+            "description" : "Spending limit in euros for this category and month",
+            "example" : 300.0,
+            "minimum" : 0
+          }
+        },
+        "required" : [ "amountLimit", "categoryId", "month" ]
+      },
+      "MonthlySummary" : {
+        "type" : "object",
+        "properties" : {
+          "month" : {
+            "type" : "string",
+            "description" : "The month of the report",
+            "example" : "2026-08"
+          },
+          "totalIncome" : {
+            "type" : "number",
+            "description" : "Sum of all income in the month",
+            "example" : 2000.0
+          },
+          "totalExpenses" : {
+            "type" : "number",
+            "description" : "Sum of all expenses in the month",
+            "example" : 1060.0
+          },
+          "balance" : {
+            "type" : "number",
+            "description" : "Income minus expenses",
+            "example" : 940.0
+          },
+          "spentPerCategoriesList" : {
+            "type" : "array",
+            "description" : "One line per expense category, sorted by spending, highest first",
+            "items" : {
+              "$ref" : "#/components/schemas/SpentPerCategory"
+            }
+          }
+        }
+      },
+      "SpentPerCategory" : {
+        "type" : "object",
+        "properties" : {
+          "categoryId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID of the category",
+            "example" : "0557e90c-7bc4-40b1-a60d-c25ef6896fa3"
+          },
+          "categoryName" : {
+            "type" : "string",
+            "description" : "Name of the category",
+            "example" : "Food"
+          },
+          "totalSpent" : {
+            "type" : "number",
+            "description" : "Amount spent in this category this month",
+            "example" : 250.0
+          },
+          "budgetLimit" : {
+            "type" : "number",
+            "description" : "Budget limit for the month; empty when there is no budget",
+            "example" : 300.0
+          },
+          "balance" : {
+            "type" : "number",
+            "description" : "Budget left; negative when over the limit, empty when there is no budget",
+            "example" : 50.0
+          },
+          "budgetUsedInPercentage" : {
+            "type" : "number",
+            "description" : "Share of the budget used, in percent; empty when there is no budget",
+            "example" : 83.33
+          },
+          "budgetStatus" : {
+            "type" : "string",
+            "description" : "OK below 80%, WARNING from 80% to 100%, OVER_LIMIT above 100%, NOT_SET without a budget",
+            "enum" : [ "OK", "WARNING", "OVER_LIMIT", "NOT_SET" ],
+            "example" : "WARNING"
+          }
+        }
+      }
+    }
+  }
+}

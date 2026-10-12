@@ -92,6 +92,10 @@ Design documents are in the [`docs`](docs) folder:
 - [Architecture](docs/architecture.md)
 - [Database Design](docs/database-design.md)
 - [API Design](docs/api-design.md)
+- [OpenAPI specification](docs/api/openapi.json) — the full API description.
+    Import it into Postman (File → Import), or paste it into
+    [editor.swagger.io](https://editor.swagger.io) to browse the API without running the app.
+- - Swagger UI at `http://localhost:8080/swagger-ui.html` when the app is running.
 
 ## Project Structure
 
@@ -108,6 +112,8 @@ com.saurabh.financemanager
 ```
 
 Each feature package contains its own entity, repository, service, controller and DTOs.
+
+
 
 ## Author
 
