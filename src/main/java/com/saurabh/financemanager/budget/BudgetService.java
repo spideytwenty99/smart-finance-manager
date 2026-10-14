@@ -8,6 +8,7 @@ import com.saurabh.financemanager.category.CategoryRepository;
 import com.saurabh.financemanager.exception.DuplicateResourceException;
 import com.saurabh.financemanager.exception.ResourceNotFoundException;
 import com.saurabh.financemanager.transaction.TransactionType;
+import com.saurabh.financemanager.user.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,16 +22,17 @@ public class BudgetService {
 
     private final BudgetRepository budgetRepository;
     private final CategoryRepository categoryRepository;
+    private  final UserRepository userRepository;
 
-    public BudgetService(BudgetRepository budgetRepository, CategoryRepository categoryRepository) {
+    public BudgetService(BudgetRepository budgetRepository, CategoryRepository categoryRepository,UserRepository userRepository) {
         this.budgetRepository = budgetRepository;
         this.categoryRepository = categoryRepository;
+        this.userRepository=userRepository;
     }
 
-    // Create
     @Transactional
-    public BudgetResponse createBudget(BudgetRequest request) {
-        Category category = categoryRepository.findById(request.getCategoryId())
+    public BudgetResponse createBudget(UUID userId, BudgetRequest request) {
+        Category category = categoryRepository.findByIdAndUserId(request.getCategoryId(), userId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Category with id " + request.getCategoryId() + " not found"));
 
@@ -44,43 +46,40 @@ public class BudgetService {
                     "Category '" + category.getName() + "' already has a budget for " + request.getMonth());
         }
 
-        Budget savedBudget = budgetRepository.save(mapToEntity(request, category));
-        return mapToDto(savedBudget);
+        Budget budget = mapToEntity(request, category);
+        budget.setUser(userRepository.getReferenceById(userId));
+
+        return mapToDto(budgetRepository.save(budget));
     }
 
-    // Get one budget by its id
     @Transactional(readOnly = true)
-    public BudgetResponse getBudget(UUID id) {
-        Budget budget = budgetRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Budget with id " + id + " not found"));
-        return mapToDto(budget);
+    public BudgetResponse getBudget(UUID userId, UUID id) {
+        return mapToDto(findOwned(userId, id));
     }
 
-    // Get all budgets for a month
     @Transactional(readOnly = true)
-    public List<BudgetResponse> getBudgetsForMonth(YearMonth month) {
-        return budgetRepository.findByMonth(month.atDay(1))
+    public List<BudgetResponse> getBudgetsForMonth(UUID userId, YearMonth month) {
+        return budgetRepository.findByUserIdAndMonth(userId, month.atDay(1))
                 .stream()
                 .map(this::mapToDto)
                 .toList();
     }
 
-    // Update the limit
     @Transactional
-    public BudgetResponse updateBudget(UUID id, BudgetUpdateRequest request) {
-        Budget budget = budgetRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Budget with id " + id + " not found"));
-
+    public BudgetResponse updateBudget(UUID userId, UUID id, BudgetUpdateRequest request) {
+        Budget budget = findOwned(userId, id);
         budget.setAmountLimit(request.getAmountLimit());
         return mapToDto(budgetRepository.save(budget));
     }
 
-    // Delete
     @Transactional
-    public void deleteBudget(UUID id) {
-        Budget budget = budgetRepository.findById(id)
+    public void deleteBudget(UUID userId, UUID id) {
+        budgetRepository.delete(findOwned(userId, id));
+    }
+
+    private Budget findOwned(UUID userId, UUID id) {
+        return budgetRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Budget with id " + id + " not found"));
-        budgetRepository.delete(budget);
     }
 
     private Budget mapToEntity(BudgetRequest request, Category category) {

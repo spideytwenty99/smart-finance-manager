@@ -4,6 +4,7 @@ import com.saurabh.financemanager.transaction.TransactionType;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class CategorizationService {
@@ -14,7 +15,7 @@ public class CategorizationService {
         this.categoryRepository = categoryRepository;
     }
 
-    public Optional<Category> categorize(String description, TransactionType type) {
+    public Optional<Category> categorize(UUID userId, String description, TransactionType type) {
         if (description == null || description.isBlank() || type == null) {
             return Optional.empty();
         }

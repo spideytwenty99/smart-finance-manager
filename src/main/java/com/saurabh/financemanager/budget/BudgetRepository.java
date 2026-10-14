@@ -5,21 +5,18 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
-    //All budgets for one month
-    List<Budget> findByMonth(LocalDate month);
+    Optional<Budget> findByIdAndUserId(UUID id, UUID userId);
 
-    //One category's budget for one month
-    Budget findByCategoryIdAndMonth(UUID categoryId, LocalDate month);
+    List<Budget> findByUserIdAndMonth(UUID userId, LocalDate month);
 
-    //Duplicate check before creating a budget
     boolean existsByCategoryIdAndMonth(UUID categoryId, LocalDate month);
 
-    //for delete check: is this category used by any budget?
-    long countByCategoryId(UUID id);
+    long countByCategoryId(UUID categoryId);
 
 
 

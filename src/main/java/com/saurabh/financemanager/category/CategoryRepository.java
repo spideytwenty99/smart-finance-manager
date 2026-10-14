@@ -14,9 +14,15 @@ import java.util.UUID;
 public interface CategoryRepository extends JpaRepository<Category, UUID> {
 
     List<Category> findByTransactionType(TransactionType transactionType);
-    boolean existsByNameIgnoreCaseAndTransactionType(String name,TransactionType transactionType);
 
-    Optional<Category> findByCode(String code);
 
-    Optional<Category> findByNameIgnoreCaseAndTransactionType(String name, TransactionType type);
+    List<Category> findByUserId(UUID userId);
+
+    List<Category> findByUserIdAndTransactionType(UUID userId, TransactionType transactionType);
+
+    Optional<Category> findByIdAndUserId(UUID id, UUID userId);
+
+    boolean existsByUserIdAndNameIgnoreCaseAndTransactionType(UUID userId, String name, TransactionType transactionType);
+
+    Optional<Category> findByUserIdAndCode(UUID userId, String code);
 }
