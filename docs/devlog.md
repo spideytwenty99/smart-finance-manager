@@ -342,3 +342,105 @@ go on the same page later.
 **Next**
 
 - User accounts and login with Spring Security and JWT.
+
+## 2026-10-14: Authentication, Data Ownership and Logging
+
+### Summary
+
+User accounts with JWT-based authentication were introduced, and all data was made user-owned. Previously, the API was single-user and every client had full access to all data. All endpoints except registration, login and the API documentation now require a valid token, and every query is scoped to the authenticated user.
+
+### Implementation
+
+**Authentication endpoints**
+- `POST /api/auth/register` (201) and `POST /api/auth/login` (200) both return an `AuthResponse` containing the token, the token type (`Bearer`) and its lifetime in seconds (3600).
+- Registration authenticates the new user right away, so no separate login call is needed.
+- Emails are trimmed and lowercased before they are stored or looked up, so they are effectively case-insensitive. Duplicate registrations return 409 Conflict.
+- Passwords must be between 8 and 72 characters. The upper limit matches BCrypt's 72-byte input limit.
+
+**Password storage**
+- Passwords are hashed with BCrypt. Plaintext passwords are never stored or logged.
+
+**Token handling**
+- Tokens are signed with HS256. The signing key is loaded from the `JWT_SECRET` environment variable and is never stored in source code or committed configuration.
+- Claims: issuer, issued-at, expiry, subject (user id) and email.
+- Incoming tokens are validated for signature, expiry and issuer.
+
+**Data ownership**
+- `Category`, `Transaction` and `Budget` each have a required `@ManyToOne` relationship to `User`.
+- Uniqueness constraints are now per user: categories on (user, name, type) and (user, code), budgets on (user, category, month).
+- Existing development data had no owner, so the database was reset (`docker compose down -v`) instead of migrated.
+
+**Per-user default categories**
+- The shared, startup-seeded category set was replaced by a per-user copy created at registration. Users can rename or delete their categories without affecting anyone else.
+- The defaults are defined in a single place (`DefaultCategories`), and the old `CategorySeeder` was removed.
+- The two `Uncategorized` categories (expense and income) are system categories and can't be deleted, because automatic categorization falls back to them.
+
+**Ownership enforcement**
+- Controllers get the user id from the token via `@AuthenticationPrincipal Jwt` and pass it to the service layer.
+- Every repository query is scoped by user id (for example `findByIdAndUserId` instead of `findById`).
+- The scoping also covers the monthly report aggregations, the automatic categorization lookup, and checking that a category id given on a transaction or budget belongs to the current user.
+
+**Logging**
+- SLF4J loggers via Lombok's `@Slf4j`:
+  - `INFO`: user registered, user logged in, transaction created, category assigned automatically
+  - `WARN`: failed login attempt
+  - `ERROR`: unhandled exceptions in `GlobalExceptionHandler`, with the full stack trace
+- Logs contain identifiers only. Passwords, tokens, email addresses, amounts and transaction descriptions are never logged.
+
+**API documentation**
+- A bearer token security scheme in Swagger UI, with an "Authorize" button.
+- A 401 response with the `ErrorResponse` schema documented on every protected endpoint.
+- A dedicated "Authentication" tag. `openapi.json` was re-exported.
+
+### Design Decisions
+
+**Built-in resource server instead of a custom JWT filter.** A common approach is a hand-written `JwtAuthFilter`. Spring Security's OAuth2 resource server already provides `BearerTokenAuthenticationFilter`, which handles header parsing, signature and claim validation, and setting the security context. Using it cuts the amount of security-critical custom code down to a single configuration line, and with it the risk of implementation mistakes.
+
+**AuthenticationManager for credential checks.** Login delegates to Spring's `AuthenticationManager`, backed by a `DaoAuthenticationProvider` with a custom `UserDetailsService` and the BCrypt encoder. This follows the framework's standard authentication flow instead of comparing passwords by hand.
+
+**Uniform response for invalid credentials.** An unknown email and a wrong password both return 401 with "Invalid email or password". This prevents account enumeration.
+
+**404 instead of 403 for foreign resources.** A request for another user's resource returns 404 Not Found. A 403 would confirm that the resource exists.
+
+**Stateless sessions and disabled CSRF protection.** The server keeps no session state. CSRF protection is disabled because the token is sent in the `Authorization` header, which browsers never attach on their own, unlike cookies. If token storage ever moves to cookies, CSRF protection must be turned back on.
+
+**Consistent 401 responses.** Authentication failures are rejected in the security filter chain, before any controller runs, so `GlobalExceptionHandler` never sees them. A custom `AuthenticationEntryPoint` returns them in the same `ErrorResponse` format as every other error.
+
+### Issues Found and Resolved
+
+**Cross-user data access in automatic categorization (found by unit tests).**
+`CategorizationService.categorize()` took a user id but never used it. It still called an unscoped `findByTransactionType` query, so a transaction could be assigned to a category owned by another user. Manual testing didn't reveal this, because every user starts with identical default categories. `CategorizationServiceTest` caught it when Mockito reported the user-scoped stub as unused. The query was fixed, and the unscoped repository method was removed entirely, so this kind of access is no longer possible.
+
+**Authentication entry point not registered (found by controller tests).**
+`JsonAuthenticationEntryPoint` was implemented but never registered in the security configuration. Spring's default entry point returned 401 responses with an empty body. It is now registered for both missing tokens (`exceptionHandling`) and invalid tokens (`oauth2ResourceServer`).
+
+**Missing configuration in CI.**
+The application context failed to start in GitHub Actions because `JWT_SECRET` wasn't defined there. A dedicated, non-production test key was added to the workflow.
+
+**Issues found during implementation:**
+- Passwords were initially saved without hashing.
+- Emails weren't trimmed before they were saved.
+- A malformed property placeholder (`{jwt.expiry}` instead of `${jwt.expiry}`) meant the expiry value was never read.
+- Tokens were initially created without an expiry claim.
+- A logger was initialized with the wrong class (`AuthService.class` inside `TransactionService`).
+
+**Security test setup.**
+`spring-boot-starter-security-test` was removed earlier because it made all controller tests fail with 401/403 before authentication existed. It has now been added back. Controller tests use `.with(jwt())` to simulate an authenticated user and `@Import(SecurityConfig.class)` so they run against the application's real security rules.
+
+### Workflow
+
+All of this work was first committed to local `main` by mistake. Before pushing, the commits were moved to a `feature/auth` branch and `main` was reset to `origin/main`. The changes went through pull request #1: CI flagged the issues above, they were fixed on the branch, and the PR was merged after all checks passed. From now on, new work starts on a feature branch.
+
+### Key Takeaways
+
+- Using framework-provided security components and configuring them correctly is preferable to custom implementations.
+- A security component only has an effect once it is registered. The missing entry point compiled and passed review without doing anything.
+- A method that takes a `userId` but doesn't use it is an easy leak to overlook. Removing unscoped repository methods prevents it structurally.
+- Ownership tests with two separate users are the most important tests in a multi-user API.
+
+### Next Steps
+
+- Update the README: registration and login, authorizing in Swagger UI, and configuring `JWT_SECRET`.
+- Tag release `v1.1.0`.
+- Add ML-based features, starting with transaction categorization to complement the keyword matching.
+- Explore an optional AI assistant that answers questions about the user's spending and budgets.
