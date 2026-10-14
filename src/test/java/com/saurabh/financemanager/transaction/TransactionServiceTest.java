@@ -3,9 +3,12 @@ package com.saurabh.financemanager.transaction;
 import com.saurabh.financemanager.category.CategorizationService;
 import com.saurabh.financemanager.category.Category;
 import com.saurabh.financemanager.category.CategoryRepository;
+import com.saurabh.financemanager.category.DefaultCategories;
 import com.saurabh.financemanager.exception.ResourceNotFoundException;
 import com.saurabh.financemanager.transaction.dto.TransactionRequest;
 import com.saurabh.financemanager.transaction.dto.TransactionResponse;
+import com.saurabh.financemanager.user.User;
+import com.saurabh.financemanager.user.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -21,15 +24,21 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionServiceTest {
+
+    private static final UUID USER_ID = UUID.randomUUID();
+    private static final UUID CATEGORY_ID = UUID.randomUUID();
+    private static final UUID TRANSACTION_ID = UUID.randomUUID();
 
     @Mock
     private TransactionRepository transactionRepository;
@@ -40,20 +49,25 @@ class TransactionServiceTest {
     @Mock
     private CategorizationService categorizationService;
 
+    @Mock
+    private UserRepository userRepository;
+
     @InjectMocks
     private TransactionService transactionService;
 
     private final Category food = category("FOOD", TransactionType.EXPENSE);
     private final Category groceries = category("Groceries", TransactionType.EXPENSE);
     private final Category salary = category("Salary", TransactionType.INCOME);
+    private final Category uncategorized = category("Uncategorized", TransactionType.EXPENSE);
+
+    // choosing the category
 
     @Test
     void shouldCreateTransactionWithChosenCategory() {
-        UUID foodId = UUID.randomUUID();
-        when(categoryRepository.findById(foodId)).thenReturn(Optional.of(food));
+        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(food));
         givenSaveReturnsWhatItGets();
 
-        TransactionResponse response = transactionService.createTransaction(request(foodId, null, "Lunch"));
+        TransactionResponse response = transactionService.createTransaction(USER_ID, request(CATEGORY_ID, null, "Lunch"));
 
         assertEquals("FOOD", response.getCategoryName());
         assertEquals(TransactionType.EXPENSE, response.getTransactionType());
@@ -61,54 +75,94 @@ class TransactionServiceTest {
     }
 
     @Test
-    void shouldThrowWhenCategoryDoesNotExist() {
-        UUID unknownId = UUID.randomUUID();
-        when(categoryRepository.findById(unknownId)).thenReturn(Optional.empty());
+    void shouldRejectCategoryThatIsMissingOrBelongsToAnotherUser() {
+        // To this user, another user's category looks exactly like a missing one
+        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
-                () -> transactionService.createTransaction(request(unknownId, null, "Lunch")));
+                () -> transactionService.createTransaction(USER_ID, request(CATEGORY_ID, null, "Lunch")));
 
         verify(transactionRepository, never()).save(any());
     }
 
     @Test
     void shouldRejectTypeThatDoesNotMatchCategory() {
-        UUID salaryId = UUID.randomUUID();
-        when(categoryRepository.findById(salaryId)).thenReturn(Optional.of(salary));
+        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(salary));
 
         assertThrows(IllegalArgumentException.class,
-                () -> transactionService.createTransaction(request(salaryId, TransactionType.EXPENSE, "Test")));
+                () -> transactionService.createTransaction(USER_ID, request(CATEGORY_ID, TransactionType.EXPENSE, "Test")));
 
         verify(transactionRepository, never()).save(any());
     }
 
     @Test
     void shouldAskRulesWhenNoCategoryIsGiven() {
-        when(categorizationService.categorize("REWE Markt", TransactionType.EXPENSE))
+        when(categorizationService.categorize(USER_ID, "REWE Markt", TransactionType.EXPENSE))
                 .thenReturn(Optional.of(groceries));
         givenSaveReturnsWhatItGets();
 
         TransactionResponse response = transactionService.createTransaction(
-                request(null, TransactionType.EXPENSE, "REWE Markt"));
+                USER_ID, request(null, TransactionType.EXPENSE, "REWE Markt"));
 
-        verify(categorizationService).categorize("REWE Markt", TransactionType.EXPENSE);
+        verify(categorizationService).categorize(USER_ID, "REWE Markt", TransactionType.EXPENSE);
         assertEquals("Groceries", response.getCategoryName());
         assertTrue(response.isAutoCategorized());
     }
 
     @Test
-    void shouldNeverOverrideChosenCategory() {
-        // "REWE" would match Groceries, but the user picked FOOD
-        UUID foodId = UUID.randomUUID();
-        when(categoryRepository.findById(foodId)).thenReturn(Optional.of(food));
+    void shouldFallBackToUsersOwnUncategorizedWhenNothingMatches() {
+        when(categorizationService.categorize(USER_ID, "Birthday present", TransactionType.EXPENSE))
+                .thenReturn(Optional.empty());
+        when(categoryRepository.findByUserIdAndCode(USER_ID, DefaultCategories.UNCATEGORIZED_EXPENSE))
+                .thenReturn(Optional.of(uncategorized));
         givenSaveReturnsWhatItGets();
 
-        TransactionResponse response = transactionService.createTransaction(request(foodId, null, "REWE Markt"));
+        TransactionResponse response = transactionService.createTransaction(
+                USER_ID, request(null, TransactionType.EXPENSE, "Birthday present"));
 
-        verify(categorizationService, never()).categorize(any(), any());
+        assertEquals("Uncategorized", response.getCategoryName());
+        assertFalse(response.isAutoCategorized());
+    }
+
+    @Test
+    void shouldNeverOverrideChosenCategory() {
+        // "REWE" would match Groceries, but the user picked FOOD
+        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(food));
+        givenSaveReturnsWhatItGets();
+
+        TransactionResponse response = transactionService.createTransaction(
+                USER_ID, request(CATEGORY_ID, null, "REWE Markt"));
+
+        verify(categorizationService, never()).categorize(any(), any(), any());
         assertEquals("FOOD", response.getCategoryName());
         assertFalse(response.isAutoCategorized());
     }
+
+    // ownership
+
+    @Test
+    void shouldSetCurrentUserAsOwner() {
+        User currentUser = new User();
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(currentUser);
+        when(categoryRepository.findByIdAndUserId(CATEGORY_ID, USER_ID)).thenReturn(Optional.of(food));
+        givenSaveReturnsWhatItGets();
+
+        transactionService.createTransaction(USER_ID, request(CATEGORY_ID, null, "Lunch"));
+
+        ArgumentCaptor<Transaction> saved = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository).save(saved.capture());
+        assertSame(currentUser, saved.getValue().getUser());
+    }
+
+    @Test
+    void shouldNotReturnTransactionOfAnotherUser() {
+        when(transactionRepository.findByIdAndUserId(TRANSACTION_ID, USER_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> transactionService.getTransaction(USER_ID, TRANSACTION_ID));
+    }
+
+    // filters
 
     @Test
     void shouldAskRepositoryForFirstAndLastDayOfMonth() {
@@ -116,13 +170,14 @@ class TransactionServiceTest {
         ArgumentCaptor<LocalDate> end = ArgumentCaptor.forClass(LocalDate.class);
 
         // February 2026: 28 days, a good test for "last day"
-        transactionService.getTransactions(null, null, YearMonth.of(2026, 2), null);
+        transactionService.getTransactions(USER_ID, null, null, YearMonth.of(2026, 2), null);
 
-        verify(transactionRepository).findByTransactionDateBetween(start.capture(), end.capture());
+        verify(transactionRepository).findByUserIdAndTransactionDateBetween(eq(USER_ID), start.capture(), end.capture());
         assertEquals(LocalDate.of(2026, 2, 1), start.getValue());
         assertEquals(LocalDate.of(2026, 2, 28), end.getValue());
     }
 
+    // helpers
 
     private void givenSaveReturnsWhatItGets() {
         when(transactionRepository.save(any(Transaction.class)))

@@ -15,9 +15,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.List;
+import java.time.YearMonth;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,6 +29,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ReportServiceTest {
 
+    private static final UUID USER_ID = UUID.randomUUID();
+    private static final YearMonth AUGUST = YearMonth.of(2026, 8);
+
     @Mock
     private TransactionRepository transactionRepository;
 
@@ -39,27 +41,27 @@ class ReportServiceTest {
     @InjectMocks
     private ReportService reportService;
 
-    private static final YearMonth AUGUST = YearMonth.of(2026, 8);
-
-    // The categories
+    // Categories used in the sample month
     private final Category food = category("Food");
     private final Category transport = category("Transport");
     private final Category rent = category("Rent");
     private final Category uncategorized = category("Uncategorized");
     private final Category gym = category("Gym");
 
+    // totals
 
     @Test
     void shouldCalculateTotalsAndBalance() {
         givenSampleMonth();
 
-        MonthlySummary summary = reportService.getMonthlySummary(AUGUST);
+        MonthlySummary summary = reportService.getMonthlySummary(USER_ID, AUGUST);
 
         assertAmount("2000", summary.totalIncome());
         assertAmount("1060", summary.totalExpenses());
         assertAmount("940", summary.balance());
     }
 
+    // boundaries
 
     @Test
     void shouldBeOkJustBelow80Percent() {
@@ -94,10 +96,10 @@ class ReportServiceTest {
 
 
     @Test
-    void shouldCalculateBudgetLinesLikeStep6() {
+    void shouldCalculateRemainingPercentAndStatusPerLine() {
         givenSampleMonth();
 
-        List<SpentPerCategory> rows = reportService.getMonthlySummary(AUGUST).spentPerCategoriesList();
+        List<SpentPerCategory> rows = reportService.getMonthlySummary(USER_ID, AUGUST).spentPerCategoriesList();
 
         SpentPerCategory foodRow = row(rows, "Food");
         assertAmount("50", foodRow.balance());
@@ -113,7 +115,7 @@ class ReportServiceTest {
     void shouldShowBudgetWithNoSpending() {
         givenSampleMonth();
 
-        List<SpentPerCategory> rows = reportService.getMonthlySummary(AUGUST).spentPerCategoriesList();
+        List<SpentPerCategory> rows = reportService.getMonthlySummary(USER_ID, AUGUST).spentPerCategoriesList();
 
         SpentPerCategory gymRow = row(rows, "Gym");
         assertAmount("0", gymRow.totalSpent());
@@ -125,7 +127,7 @@ class ReportServiceTest {
     void shouldGiveUncategorizedExpensesTheirOwnLine() {
         givenSampleMonth();
 
-        List<SpentPerCategory> rows = reportService.getMonthlySummary(AUGUST).spentPerCategoriesList();
+        List<SpentPerCategory> rows = reportService.getMonthlySummary(USER_ID, AUGUST).spentPerCategoriesList();
 
         SpentPerCategory uncategorizedRow = row(rows, "Uncategorized");
         assertAmount("20", uncategorizedRow.totalSpent());
@@ -137,7 +139,7 @@ class ReportServiceTest {
     void shouldSortLinesBySpendingHighestFirst() {
         givenSampleMonth();
 
-        List<String> names = reportService.getMonthlySummary(AUGUST).spentPerCategoriesList()
+        List<String> names = reportService.getMonthlySummary(USER_ID, AUGUST).spentPerCategoriesList()
                 .stream()
                 .map(SpentPerCategory::categoryName)
                 .toList();
@@ -145,13 +147,13 @@ class ReportServiceTest {
         assertEquals(List.of("Rent", "Food", "Transport", "Uncategorized", "Gym"), names);
     }
 
-    // ---------- empty and null ----------
+    // empty and null
 
     @Test
     void shouldGiveZerosForEmptyMonth() {
         givenMonth(BigDecimal.ZERO, BigDecimal.ZERO, List.of(), List.of());
 
-        MonthlySummary summary = reportService.getMonthlySummary(AUGUST);
+        MonthlySummary summary = reportService.getMonthlySummary(USER_ID, AUGUST);
 
         assertAmount("0", summary.totalIncome());
         assertAmount("0", summary.totalExpenses());
@@ -163,13 +165,18 @@ class ReportServiceTest {
     void shouldNotCrashWhenSumsAreNull() {
         givenMonth(null, null, List.of(), List.of());
 
-        MonthlySummary summary = reportService.getMonthlySummary(AUGUST);
+        MonthlySummary summary = reportService.getMonthlySummary(USER_ID, AUGUST);
 
         assertAmount("0", summary.totalIncome());
         assertAmount("0", summary.totalExpenses());
         assertAmount("0", summary.balance());
     }
 
+    // helpers
+
+    // A typical month: 2000 income, 1060 expenses.
+    // Food 250 of a 300 budget (WARNING), Transport 90 of 80 (OVER),
+    // Rent 700 and Uncategorized 20 without budgets, and a Gym budget of 30 with no spending.
     private void givenSampleMonth() {
         givenMonth(
                 new BigDecimal("2000"),
@@ -185,12 +192,14 @@ class ReportServiceTest {
                         budget(gym, "30")));
     }
 
+    // All repository calls are stubbed for USER_ID only, so the tests also
+    // prove that the service passes the user id into every query
     private void givenMonth(BigDecimal income, BigDecimal expenses,
                             List<TotalByCategory> totals, List<Budget> budgets) {
-        when(transactionRepository.sumByType(any(), any(), eq(TransactionType.INCOME))).thenReturn(income);
-        when(transactionRepository.sumByType(any(), any(), eq(TransactionType.EXPENSE))).thenReturn(expenses);
-        when(transactionRepository.totalPerCategory(any(), any(), eq(TransactionType.EXPENSE))).thenReturn(totals);
-        when(budgetRepository.findByMonth(AUGUST.atDay(1))).thenReturn(budgets);
+        when(transactionRepository.sumByType(eq(USER_ID), any(), any(), eq(TransactionType.INCOME))).thenReturn(income);
+        when(transactionRepository.sumByType(eq(USER_ID), any(), any(), eq(TransactionType.EXPENSE))).thenReturn(expenses);
+        when(transactionRepository.totalPerCategory(eq(USER_ID), any(), any(), eq(TransactionType.EXPENSE))).thenReturn(totals);
+        when(budgetRepository.findByUserIdAndMonth(USER_ID, AUGUST.atDay(1))).thenReturn(budgets);
     }
 
     // One category, one budget: returns its line
@@ -198,7 +207,7 @@ class ReportServiceTest {
         givenMonth(BigDecimal.ZERO, new BigDecimal(spent),
                 List.of(total(food, spent)),
                 List.of(budget(food, limit)));
-        return reportService.getMonthlySummary(AUGUST).spentPerCategoriesList().get(0);
+        return reportService.getMonthlySummary(USER_ID, AUGUST).spentPerCategoriesList().get(0);
     }
 
     private static Category category(String name) {
