@@ -24,7 +24,7 @@ public class CategorizationService {
         Category bestCategory = null;
         String bestKeyword = null;
 
-        for (Category category : categoryRepository.findByTransactionType(type)) {
+        for (Category category : categoryRepository.findByUserIdAndTransactionType(userId,type)) {
             if (category.getKeywords() == null) {
                 continue;
             }
