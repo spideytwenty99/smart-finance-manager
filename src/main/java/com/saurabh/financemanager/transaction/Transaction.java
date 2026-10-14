@@ -2,6 +2,7 @@ package com.saurabh.financemanager.transaction;
 
 
 import com.saurabh.financemanager.category.Category;
+import com.saurabh.financemanager.user.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -51,5 +52,9 @@ public class Transaction {
 
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean autoCategorized;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
 }

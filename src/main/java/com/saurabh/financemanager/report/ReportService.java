@@ -32,16 +32,16 @@ public class ReportService {
     }
 
     @Transactional(readOnly = true)
-    public MonthlySummary getMonthlySummary(YearMonth month) {
+    public MonthlySummary getMonthlySummary(UUID userId, YearMonth month) {
         LocalDate start = month.atDay(1);
         LocalDate end = month.atEndOfMonth();
 
-        BigDecimal totalIncome = zeroIfNull(transactionRepository.sumByType(start, end, TransactionType.INCOME));
-        BigDecimal totalExpense =zeroIfNull( transactionRepository.sumByType(start, end, TransactionType.EXPENSE));
+        BigDecimal totalIncome = zeroIfNull(transactionRepository.sumByType(userId, start, end, TransactionType.INCOME));
+        BigDecimal totalExpense = zeroIfNull(transactionRepository.sumByType(userId, start, end, TransactionType.EXPENSE));
         BigDecimal balance = totalIncome.subtract(totalExpense);
 
-        List<TotalByCategory> totals = transactionRepository.totalPerCategory(start, end, TransactionType.EXPENSE);
-        List<Budget> budgets = budgetRepository.findByMonth(start);
+        List<TotalByCategory> totals = transactionRepository.totalPerCategory(userId, start, end, TransactionType.EXPENSE);
+        List<Budget> budgets = budgetRepository.findByUserIdAndMonth(userId, start);
 
         List<SpentPerCategory> rows = buildAllCategoryRows(totals, budgets);
 

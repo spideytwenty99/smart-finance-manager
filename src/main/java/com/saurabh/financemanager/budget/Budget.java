@@ -1,6 +1,7 @@
 package com.saurabh.financemanager.budget;
 
 import com.saurabh.financemanager.category.Category;
+import com.saurabh.financemanager.user.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Cleanup;
@@ -18,7 +19,7 @@ import java.util.UUID;
 @Setter
 @Entity
 @Table(name = "budgets",
-        uniqueConstraints = @UniqueConstraint(columnNames={"category_id","month"}))
+        uniqueConstraints = @UniqueConstraint(columnNames={"user_id","category_id","month"}))
 public class Budget {
     @Id
     @GeneratedValue(strategy= GenerationType.UUID)
@@ -42,6 +43,10 @@ public class Budget {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
 
 }

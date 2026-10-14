@@ -1,5 +1,6 @@
 package com.saurabh.financemanager.category;
 
+import com.saurabh.financemanager.authentication.CurrentUser;
 import com.saurabh.financemanager.category.dto.CategoryRequest;
 import com.saurabh.financemanager.category.dto.CategoryResponse;
 import com.saurabh.financemanager.exception.ErrorResponse;
@@ -13,6 +14,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,8 +42,8 @@ public class CategoryController {
     @ApiResponse(responseCode = "409", description = "A category with this name and type already exists",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping
-    public ResponseEntity<CategoryResponse> createCategory(@Valid @RequestBody CategoryRequest categoryRequest) {
-        CategoryResponse response = categoryService.createCategory(categoryRequest);
+    public ResponseEntity<CategoryResponse> createCategory( @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CategoryRequest categoryRequest) {
+        CategoryResponse response = categoryService.createCategory(CurrentUser.id(jwt),categoryRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -52,8 +55,9 @@ public class CategoryController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping("/{id}")
     public ResponseEntity<CategoryResponse> getCategory(
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "ID of the category") @PathVariable UUID id) {
-        return ResponseEntity.ok(categoryService.getCategory(id));
+        return ResponseEntity.ok(categoryService.getCategory(CurrentUser.id(jwt),id));
     }
 
     @Operation(summary = "List categories",
@@ -63,9 +67,10 @@ public class CategoryController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping
     public ResponseEntity<List<CategoryResponse>> getAllCategories(
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Optional filter: only categories of this type. Without it, all categories are returned.")
             @RequestParam(required = false) TransactionType type) {
-        return ResponseEntity.ok(categoryService.getAllCategory(type));
+        return ResponseEntity.ok(categoryService.getAllCategories(CurrentUser.id(jwt), type));
     }
 
     @Operation(summary = "Update a category",
@@ -80,9 +85,10 @@ public class CategoryController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PutMapping("/{id}")
     public ResponseEntity<CategoryResponse> update(
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "ID of the category") @PathVariable UUID id,
             @Valid @RequestBody CategoryRequest categoryRequest) {
-        return ResponseEntity.ok(categoryService.update(id, categoryRequest));
+        return ResponseEntity.ok(categoryService.update(CurrentUser.id(jwt),id,categoryRequest));
     }
 
     @Operation(summary = "Delete a category",
@@ -96,8 +102,9 @@ public class CategoryController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCategory(
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "ID of the category") @PathVariable UUID id) {
-        categoryService.delete(id);
+        categoryService.delete(CurrentUser.id(jwt),id);
         return ResponseEntity.noContent().build();
     }
 }

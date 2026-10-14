@@ -2,6 +2,7 @@ package com.saurabh.financemanager.category;
 
 
 import com.saurabh.financemanager.transaction.TransactionType;
+import com.saurabh.financemanager.user.User;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -17,7 +18,11 @@ import java.util.UUID;
 @AllArgsConstructor
 
 @Entity
-@Table(name = "categories")
+@Table(name = "categories",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"user_id", "name", "transaction_type"}),
+                @UniqueConstraint(columnNames = {"user_id", "code"})
+        })
 public class Category {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -47,7 +52,11 @@ public class Category {
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean systemCategory;
 
-    @Column(unique = true, length = 50)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(length = 50)          // no longer unique on its own
     private String code;
 
 

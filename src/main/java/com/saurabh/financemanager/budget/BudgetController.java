@@ -1,5 +1,6 @@
 package com.saurabh.financemanager.budget;
 
+import com.saurabh.financemanager.authentication.CurrentUser;
 import com.saurabh.financemanager.budget.dto.BudgetRequest;
 import com.saurabh.financemanager.budget.dto.BudgetResponse;
 import com.saurabh.financemanager.budget.dto.BudgetUpdateRequest;
@@ -14,6 +15,8 @@ import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.YearMonth;
@@ -41,8 +44,9 @@ public class BudgetController {
     @ApiResponse(responseCode = "409", description = "This category already has a budget for this month",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping
-    public ResponseEntity<BudgetResponse> createBudget(@Valid @RequestBody BudgetRequest request) {
-        BudgetResponse response = budgetService.createBudget(request);
+    public ResponseEntity<BudgetResponse> createBudget(@Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
+                                                       @Valid @RequestBody BudgetRequest request) {
+        BudgetResponse response = budgetService.createBudget(CurrentUser.id(jwt),request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -54,8 +58,9 @@ public class BudgetController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping("/{id}")
     public ResponseEntity<BudgetResponse> getBudget(
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "ID of the budget") @PathVariable UUID id) {
-        return ResponseEntity.ok(budgetService.getBudget(id));
+        return ResponseEntity.ok(budgetService.getBudget(CurrentUser.id(jwt),id));
     }
 
     @Operation(summary = "List budgets for a month",
@@ -65,9 +70,10 @@ public class BudgetController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping
     public ResponseEntity<List<BudgetResponse>> getBudgetsForMonth(
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Month in the format YYYY-MM. Required.", example = "2026-10")
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth month) {
-        return ResponseEntity.ok(budgetService.getBudgetsForMonth(month));
+        return ResponseEntity.ok(budgetService.getBudgetsForMonth(CurrentUser.id(jwt),month));
     }
 
     @Operation(summary = "Update a budget's limit",
@@ -79,9 +85,10 @@ public class BudgetController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PutMapping("/{id}")
     public ResponseEntity<BudgetResponse> updateBudget(
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "ID of the budget") @PathVariable UUID id,
             @Valid @RequestBody BudgetUpdateRequest request) {
-        return ResponseEntity.ok(budgetService.updateBudget(id, request));
+        return ResponseEntity.ok(budgetService.updateBudget(CurrentUser.id(jwt),id, request));
     }
 
     @Operation(summary = "Delete a budget",
@@ -93,8 +100,9 @@ public class BudgetController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteBudget(
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "ID of the budget") @PathVariable UUID id) {
-        budgetService.deleteBudget(id);
+        budgetService.deleteBudget(CurrentUser.id(jwt),id);
         return ResponseEntity.noContent().build();
     }
 }

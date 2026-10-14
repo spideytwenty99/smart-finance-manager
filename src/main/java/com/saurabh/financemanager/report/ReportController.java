@@ -1,5 +1,6 @@
 package com.saurabh.financemanager.report;
 
+import com.saurabh.financemanager.authentication.CurrentUser;
 import com.saurabh.financemanager.exception.ErrorResponse;
 import com.saurabh.financemanager.report.dto.MonthlySummary;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,6 +11,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -38,11 +42,12 @@ public class ReportController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @GetMapping
     public ResponseEntity<MonthlySummary> getMonthlyReport(
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Month in the format YYYY-MM. Optional; without it, the current month is used.", example = "2026-10")
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM") YearMonth month) {
         if (month == null) {
             month = YearMonth.now();
         }
-        return ResponseEntity.ok(reportService.getMonthlySummary(month));
+        return ResponseEntity.ok(reportService.getMonthlySummary(CurrentUser.id(jwt), month));
     }
 }
