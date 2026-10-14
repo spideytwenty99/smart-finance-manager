@@ -2,7 +2,7 @@
   "openapi" : "3.1.0",
   "info" : {
     "title" : "Smart Finance Manager API",
-    "description" : "Track income and expenses, set monthly budgets per category, and get a monthly report with budget status. Transactions without a category are categorized automatically from their description.",
+    "description" : "Track income and expenses, set monthly budgets per category and get a monthly report with budget status. Transactions without a category are categorized automatically from their description. Register or log in to get a token, then click Authorize and paste it.",
     "contact" : {
       "name" : "Saurabh",
       "url" : "https://github.com/spideytwenty99/smart-finance-manager"
@@ -13,6 +13,9 @@
     "url" : "http://localhost:8080",
     "description" : "Generated server url"
   } ],
+  "security" : [ {
+    "bearerAuth" : [ ]
+  } ],
   "tags" : [ {
     "name" : "Categories",
     "description" : "Income and expense categories, including built-in ones with keywords for automatic categorization."
@@ -20,11 +23,24 @@
     "name" : "Reports",
     "description" : "Monthly summary of income, expenses and spending against budgets."
   }, {
+    "name" : "Categories"
+  }, {
+    "name" : "Authentication"
+  }, {
     "name" : "Transactions",
     "description" : "Income and expense entries; categorized automatically when no category is given."
   }, {
+    "name" : "Authentication",
+    "description" : "Register and log in to get a JWT for the other endpoints."
+  }, {
     "name" : "Budgets",
     "description" : "Monthly spending limits per expense category."
+  }, {
+    "name" : "Budgets"
+  }, {
+    "name" : "Reports"
+  }, {
+    "name" : "Transactions"
   } ],
   "paths" : {
     "/api/transactions/{id}" : {
@@ -802,6 +818,106 @@
         }
       }
     },
+    "/api/auth/register" : {
+      "post" : {
+        "tags" : [ "Authentication" ],
+        "summary" : "Register a new account",
+        "description" : "Creates the account with its own copy of the default categories, and logs the user in right away. The email is stored lowercase; the password must be 8 to 72 characters.",
+        "operationId" : "register",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Account created, token returned",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid email or password format",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "An account with this email already exists",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login" : {
+      "post" : {
+        "tags" : [ "Authentication" ],
+        "summary" : "Log in",
+        "description" : "Returns a JWT. Send it as 'Authorization: Bearer <token>' on all other requests.",
+        "operationId" : "login",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Logged in, token returned",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Email or password missing",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Invalid email or password",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports" : {
       "get" : {
         "tags" : [ "Reports" ],
@@ -1128,6 +1244,51 @@
         },
         "required" : [ "amountLimit", "categoryId", "month" ]
       },
+      "RegisterRequest" : {
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "format" : "email",
+            "minLength" : 1
+          },
+          "password" : {
+            "type" : "string",
+            "maxLength" : 72,
+            "minLength" : 8
+          }
+        },
+        "required" : [ "email", "password" ]
+      },
+      "AuthResponse" : {
+        "type" : "object",
+        "properties" : {
+          "token" : {
+            "type" : "string"
+          },
+          "tokenType" : {
+            "type" : "string"
+          },
+          "expiresIn" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "LoginRequest" : {
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "password" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [ "email", "password" ]
+      },
       "MonthlySummary" : {
         "type" : "object",
         "properties" : {
@@ -1201,6 +1362,14 @@
             "example" : "WARNING"
           }
         }
+      }
+    },
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "type" : "http",
+        "description" : "Paste the token from register or login, without the word 'Bearer'.",
+        "scheme" : "bearer",
+        "bearerFormat" : "JWT"
       }
     }
   }
