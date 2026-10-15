@@ -8,7 +8,9 @@ Steps:
 4. Evaluate on the test data: accuracy, macro F1, classification report, confusion matrix.
 5. Check how well the model handles merchants it has never seen
    (4-fold cross-validation grouped by merchant, every merchant held out once).
-6. Train the final model on all data and save it to models/model.joblib.
+6. Show how a confidence threshold trades coverage for accuracy on unseen
+   merchants (the Spring app only accepts predictions above its threshold).
+7. Train the final model on all data and save it to models/model.joblib.
 
 Run from the ml-service folder:
     python -m training.train
@@ -16,6 +18,7 @@ Run from the ml-service folder:
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import joblib
 
@@ -39,7 +42,7 @@ pd.set_option("display.width", 250)
 
 
 def main():
-    # 1. Load the data
+    #Load the data
     df = pd.read_csv(DATA_FILE)
 
     X = [
@@ -51,7 +54,7 @@ def main():
     y = df["category"]
     groups = df["merchant"]
 
-    # 2. Split into training and test data
+    #Split into training and test data
     X_train, X_test, y_train, y_test = train_test_split(
         X, y,
         test_size=0.2,
@@ -62,13 +65,13 @@ def main():
     print("Training samples:", len(X_train))
     print("Test samples:", len(X_test))
 
-    # 3. Create the model
+    #Create the model
     model = make_pipeline(
         TfidfVectorizer(analyzer="char_wb"),
         LogisticRegression(max_iter=1000)
     )
 
-    # 4. Find the best hyperparameters
+    #Find the best hyperparameters
     parameters = {
         "tfidfvectorizer__ngram_range": [(2, 4), (3, 5)],
         "logisticregression__C": [0.1, 1, 10, 100]
@@ -88,7 +91,7 @@ def main():
     print("\nBest parameters:", search.best_params_)
     print("Cross-validation Macro F1:", round(search.best_score_, 3))
 
-    # 5. Evaluate on the test data
+    #Evaluate on the test data
     predictions = model.predict(X_test)
 
     train_accuracy = accuracy_score(y_train, model.predict(X_train))
@@ -107,7 +110,7 @@ def main():
     print("Confusion matrix (rows = true category, columns = predicted category):")
     print(pd.DataFrame(matrix, index=labels, columns=labels))
 
-    # 6. Test on unseen merchants (every merchant is held out once)
+    #Test on unseen merchants (every merchant is held out once)
     group_cv = StratifiedGroupKFold(n_splits=4, shuffle=True, random_state=42)
 
     unseen_predictions = cross_val_predict(
@@ -129,7 +132,26 @@ def main():
     print("Confusion matrix for unseen merchants:")
     print(pd.DataFrame(unseen_matrix, index=labels, columns=labels))
 
-    # 7. Train on all data and save
+    #Confidence threshold on unseen merchants
+    unseen_probabilities = cross_val_predict(
+        clone(search.best_estimator_),
+        X, y,
+        groups=groups,
+        cv=group_cv,
+        method="predict_proba"
+    )
+
+    classes = np.array(sorted(y.unique()))
+    confidence = unseen_probabilities.max(axis=1)
+    predicted = classes[unseen_probabilities.argmax(axis=1)]
+
+    print("\nConfidence threshold on unseen merchants:")
+    for threshold in [0.0, 0.3, 0.4, 0.5, 0.6, 0.7]:
+        accepted = confidence >= threshold
+        accuracy = accuracy_score(y[accepted], predicted[accepted])
+        print(f"  threshold {threshold:.1f}: {accepted.mean():6.1%} auto-categorized, accuracy {accuracy:6.1%}")
+
+    #Train on all data and save
     model.fit(X, y)
 
     MODEL_FILE.parent.mkdir(parents=True, exist_ok=True)

@@ -289,6 +289,21 @@ Since further tuning brings no measurable gain, fixed hyperparameters are used i
 
 The largest improvement comes from category words that were deliberately added to the synthetic data, so part of the gain reflects the generator's own design. Real bank texts contain such words often, but not always and not in this exact form. The realistic expectation for real data lies between **0.58 (without category words) and 0.79 (with them)**. Testing on real, hand-labeled transactions will show where.
 
+### Confidence threshold
+
+The service returns a confidence for every prediction, and the Spring app only accepts predictions above a threshold. The table shows the trade-off on unseen merchants, computed in `training/train.py` (step 7) on the same merchant-grouped cross-validation as the unseen-merchant score:
+
+| Threshold | Auto-categorized | Accuracy on those |
+|---|---|---|
+| none | 100.0% | 78.3% |
+| **0.3** | **78.3%** | **92.9%** |
+| 0.4 | 69.7% | 97.1% |
+| 0.5 | 60.3% | 98.6% |
+| 0.6 | 49.8% | 99.2% |
+| 0.7 | 36.7% | 99.4% |
+
+The model's errors are concentrated in low-confidence predictions. A threshold of 0.3 is used in the app: it keeps accuracy above 90% while still auto-categorizing most transactions from unknown merchants. Predictions below the threshold fall back to Uncategorized.
+
 ### Next steps
 
 1. Build the prediction service (FastAPI) so the Spring app can use the model.
