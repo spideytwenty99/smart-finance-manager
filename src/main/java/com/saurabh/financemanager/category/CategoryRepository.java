@@ -25,4 +25,8 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
     boolean existsByUserIdAndNameIgnoreCaseAndTransactionType(UUID userId, String name, TransactionType transactionType);
 
     Optional<Category> findByUserIdAndCode(UUID userId, String code);
+
+
+    Optional<Category> findByUserIdAndNameIgnoreCaseAndTransactionType(UUID userId, String name, TransactionType transactionType);
+
 }
