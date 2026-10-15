@@ -19,3 +19,6 @@ def clean(text: str) -> str:
     text = REFERENCE_CODE.sub(" ", text)
     text = NUMBER.sub(" ", text)
     return SPACES.sub(" ", text).strip()
+
+def build_input(description: str, transaction_type: str) -> str:
+    return f"{transaction_type.lower()} {clean(description)}"
