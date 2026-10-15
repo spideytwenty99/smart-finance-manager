@@ -32,4 +32,13 @@ build/
 ### VS Code ###
 .vscode/
 
+### Secrets ###
 .env
+
+### Python / ML service ###
+ml-service/.venv/
+ml-service/data/private/
+ml-service/models/*.joblib
+__pycache__/
+*.pyc
+.pytest_cache/

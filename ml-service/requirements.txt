@@ -1,0 +1,13 @@
+# Web service
+fastapi==0.143.1
+uvicorn[standard]==0.54.0
+
+# Machine learning and data
+scikit-learn==1.9.1
+pandas==3.0.6
+numpy==2.5.4
+joblib==1.6.0
+
+# Testing
+pytest==9.1.1
+httpx==0.28.1
