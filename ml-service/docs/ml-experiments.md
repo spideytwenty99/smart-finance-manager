@@ -91,11 +91,15 @@ The results split clearly into two groups.
 
 ### Next steps
 
-1. Add an evaluation on known merchants (a stratified split without grouping) to measure performance in the common case, and report both numbers side by side.
-2. Compare against the current keyword-based categorization. It is expected to score close to zero on unseen merchants.
-3. Extend the dataset with more merchants per category and with realistic category words from real bank texts.
-4. Evaluate sentence embeddings (multilingual MiniLM) + Logistic Regression, which may carry prior knowledge about brand names.
-5. Test on hand-labeled real transactions (kept local, never committed).
+### Next steps
+
+1. **Done in Experiment 2:** add an evaluation on known merchants (a stratified split without grouping) and report both numbers side by side. Result: 1.000 on known merchants.
+2. **Open:** compare against the current keyword-based categorization. It is expected to score close to zero on unseen merchants.
+3. **Done in Experiment 3:** extend the dataset with more merchants per category and with realistic category words. Result: unseen merchants improved from 0.501 to 0.789.
+4. **Open:** evaluate sentence embeddings (multilingual MiniLM) + Logistic Regression, which may carry prior knowledge about brand names.
+5. **Open:** test on hand-labeled real transactions (kept local, never committed).
+
+---
 ---
 
 ## Experiment 2: Train/test split, hyperparameter tuning and error analysis
@@ -173,9 +177,121 @@ Training accuracy and test accuracy were both 1.000 (difference 0.000), so there
 
 ### Next steps
 
-1. Fix the transfer shortcut: add bank transfers to more categories in the generator.
-2. Add more merchants per category and realistic category words (for example "TANKSTELLE", "STROM", "RESTAURANT") so the model can learn signals beyond brand names.
-3. Use a confidence threshold in the service: when the model is unsure, fall back to the keyword rules or to Uncategorized instead of guessing Shopping.
-4. Compare against the current keyword-based categorization.
-5. Evaluate sentence embeddings (multilingual MiniLM) on the unseen-merchant setup.
-6. Test on hand-labeled real transactions (kept local, never committed).
+### Next steps
+
+1. **Done in Experiment 3:** fix the transfer shortcut by adding bank transfers to more categories in the generator. Result: Health transactions predicted as Rent dropped from 43 to 6.
+2. **Done in Experiment 3:** add more merchants per category and realistic category words (for example "TANKSTELLE", "STROM", "RESTAURANT"). Result: unseen merchants improved from 0.501 to 0.789.
+3. **Planned for the service:** use a confidence threshold, so that when the model is unsure it falls back to the keyword rules or to Uncategorized instead of guessing Shopping.
+4. **Open:** compare against the current keyword-based categorization.
+5. **Open:** evaluate sentence embeddings (multilingual MiniLM) on the unseen-merchant setup.
+6. **Open:** test on hand-labeled real transactions (kept local, never committed).
+
+---
+
+---
+
+## Experiment 3: Better training data, model comparison and tuning limits
+
+**Date:** 2026-10-15
+
+### Goal
+
+1. Improve performance on unseen merchants (0.501 in Experiment 2) by improving the training data.
+2. Compare Logistic Regression with a Linear SVM.
+3. Find out how much more can be gained from hyperparameter tuning.
+
+### Changes to the data generator
+
+1. **More merchants per category.** Most categories now have 15–22 merchants instead of 4–13 (Rent and Salary: 8, Other Income: 12). More variety helps the model learn word pieces shared across merchants of the same kind, such as "apotheke", "kino" or "markt".
+2. **Category words.** Each expense category got a list of typical business words, for example `TANKSTELLE` (Transport), `RESTAURANT` (Eating Out), `STROM` (Utilities), `APOTHEKE` (Health) or `ABO` (Subscriptions). Real bank texts often contain such words (e.g. "SHELL DEUTSCHLAND OIL GMBH TANKSTELLE"). A word is added to 50% of the rows (`HINT_PROBABILITY = 0.5`), so the model also learns to handle descriptions without one.
+3. **Transfers in more categories.** In Experiment 2, bank transfers only appeared in Rent and Health, so the model learned "transfer means Rent". Utilities, Entertainment and Shopping can now also be paid by transfer, and "RECHNUNG" appears as a payment purpose in four categories.
+
+Dataset size (4,400 rows, 11 categories × 400) and preprocessing are unchanged.
+
+### Part 1: Effect of the data changes (Logistic Regression)
+
+Model and evaluation as in Experiment 2 (`training/train.py`). To see which change helped how much, the data was also generated once without category words (`HINT_PROBABILITY = 0`):
+
+| Data version | Unseen merchants macro F1 |
+|---|---|
+| Experiment 2 (before) | 0.501 |
+| More merchants + transfer fix, no category words | 0.578 |
+| More merchants + transfer fix + category words | **0.789** |
+
+Known merchants (random test split) stayed at **1.000**. Best hyperparameters: n-gram range (3, 5), `C = 1`.
+
+**Per category, unseen merchants:**
+
+| Category | Exp. 2 F1 | Exp. 3 F1 |
+|---|---|---|
+| Salary | 1.000 | 1.000 |
+| Other Income | 1.000 | 1.000 |
+| Rent | 0.948 | 0.993 |
+| Health | 0.677 | 0.880 |
+| Utilities | 0.289 | 0.791 |
+| Entertainment | 0.278 | 0.788 |
+| Subscriptions | 0.392 | 0.715 |
+| Groceries | 0.396 | 0.713 |
+| Eating Out | 0.147 | 0.636 |
+| Transport | 0.108 | 0.584 |
+| Shopping | 0.273 | 0.579 |
+
+- **More merchants and the transfer fix helped moderately (+0.08).**
+- **The transfer shortcut is gone.** Health transactions predicted as Rent dropped from 43 to 6.
+- **The Shopping fallback shrank.** Shopping was predicted 543 times instead of 1,034, and its precision rose from 0.19 to 0.50.
+- **Category words gave the largest gain (+0.21).** Every expense category now scores between 0.58 and 0.88.
+
+### Part 2: Logistic Regression vs Linear SVM
+
+A Linear SVM (`training/train_svm.py`) was trained with the same features, split and evaluation as Logistic Regression.
+
+| Model | Known merchants F1 | Unseen merchants F1 |
+|---|---|---|
+| Logistic Regression | 1.000 | 0.789 |
+| Linear SVM | 1.000 | 0.795 |
+
+`LinearSVC` was used instead of `SVC` with an RBF kernel. TF-IDF produces thousands of sparse features per transaction, where a linear model performs as well as an RBF kernel while being much faster.
+
+### Part 3: Hyperparameter tuning
+
+So far, the grid search used a normal 5-fold cross-validation on the training data. Since every merchant appears in both training and validation folds, almost every setting reached a score of 1.0, and the search could not tell them apart.
+
+For the Linear SVM, the grid search was therefore changed to **cross-validation grouped by merchant** (`StratifiedGroupKFold`), so settings are judged on unseen merchants. A larger grid of 120 combinations was tested:
+
+| Parameter | Values |
+|---|---|
+| `analyzer` | `char_wb`, `char` |
+| `ngram_range` | (1, 3), (2, 4), (2, 5), (3, 5), (3, 6) |
+| `sublinear_tf` | False, True |
+| `C` | 0.01, 0.03, 0.1, 0.3, 1, 3 |
+
+**Best settings:** `char_wb`, n-gram range (2, 5), `sublinear_tf=True`, `C = 0.1`, unseen merchants macro F1 **0.798**.
+
+The five best settings all scored between 0.795 and 0.798. Character n-grams within word boundaries (`char_wb`) worked better than across them, and `sublinear_tf` made almost no difference, since bank texts rarely repeat words.
+
+### Analysis
+
+- **The data mattered far more than the model.** The data changes improved the unseen-merchant score by +0.29. Switching to a Linear SVM changed it by +0.006, and tuning 120 combinations by another +0.003.
+- **The model has reached a plateau.** All reasonable models and settings land around 0.79–0.80. The remaining errors come from merchant names that carry no category information, not from the model configuration.
+- **Logistic Regression and Linear SVM are equivalent here.** A difference of under 0.01 is well within the normal variation between folds.
+
+### Decision
+
+**TF-IDF (character n-grams) + Logistic Regression** is used for the service:
+
+- Accuracy is equal to the Linear SVM.
+- Logistic Regression returns probabilities (`predict_proba`). The service needs them to apply a confidence threshold and fall back to keyword rules or Uncategorized when the model is unsure. `LinearSVC` would need an additional calibration step for this.
+- It trains in seconds and produces a small model file.
+
+Since further tuning brings no measurable gain, fixed hyperparameters are used instead of running a grid search on every training run.
+
+### Limitations
+
+The largest improvement comes from category words that were deliberately added to the synthetic data, so part of the gain reflects the generator's own design. Real bank texts contain such words often, but not always and not in this exact form. The realistic expectation for real data lies between **0.58 (without category words) and 0.79 (with them)**. Testing on real, hand-labeled transactions will show where.
+
+### Next steps
+
+1. Build the prediction service (FastAPI) so the Spring app can use the model.
+2. Use a confidence threshold: when the model is unsure, fall back to keyword rules or Uncategorized.
+3. Test on hand-labeled real transactions (kept local, never committed).
+4. Evaluate sentence embeddings (multilingual MiniLM), the only candidate likely to move past the current plateau on unseen merchants.
