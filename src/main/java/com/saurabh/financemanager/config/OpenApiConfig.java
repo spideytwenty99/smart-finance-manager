@@ -31,7 +31,7 @@ public class OpenApiConfig {
                                 + "and get a monthly report with budget status. "
                                 + "Transactions without a category are categorized automatically from their description. "
                                 + "Register or log in to get a token, then click Authorize and paste it.")
-                        .version("1.0.0")
+                        .version("1.1.0")
                         .contact(new Contact()
                                 .name("Saurabh")
                                 .url("https://github.com/spideytwenty99/smart-finance-manager")))
