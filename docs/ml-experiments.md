@@ -310,3 +310,89 @@ The model's errors are concentrated in low-confidence predictions. A threshold o
 2. Use a confidence threshold: when the model is unsure, fall back to keyword rules or Uncategorized.
 3. Test on hand-labeled real transactions (kept local, never committed).
 4. Evaluate sentence embeddings (multilingual MiniLM), the only candidate likely to move past the current plateau on unseen merchants.
+
+## 2026-10-16: Experiment 4 – Realistic synthetic data and extended keywords
+
+### Goal
+Experiment 3 showed that the model performs clearly worse on merchants it has not seen during training (unseen-merchant macro F1 of about 0.79, compared with almost 1.0 on known merchants). In real use, most merchants are not part of the synthetic data. This experiment measured how the categorization performs on real bank transactions, and whether more realistic synthetic data and extended keyword rules improve it.
+
+### Real test data
+- 649 real, hand-labeled transactions from four persons (`data/private/real_transactions.csv`, not committed).
+- The data was anonymized beforehand (names, private transfers, account numbers) and is used for testing only, never for training.
+- 482 transactions belong to an app category; 167 have no matching category (e.g. transfers, top-ups, hotels) and were labeled `Uncategorized`. For these, `Uncategorized` is the correct result.
+- The real labels were mapped to the app categories (e.g. Food & Drink → Eating Out, Drugstore → Groceries).
+
+### Changes
+
+**Synthetic data (version 2, `training/generate_data.py`)**
+- **More merchants:** the original hand-written merchant lists were extended with 227 real merchants from 12 public sources (`training/merchants.py`), for a total of 369 merchants (previously 187).
+- **Real bank formats:** payment provider prefixes (`SUMUP *`, `NYX*`, `PAYPAL *`), branch numbers, legal forms (`GMBH`, `OHG`), online formats (`WWW.<NAME>.DE`, `<NAME>* <REF>`), and card descriptions cut off after 22 characters.
+- **New `Uncategorized` class:** built from standard German booking texts (top-ups, transfers, cash withdrawals and deposits, bank fees, savings transfers) and hotel/booking sites.
+- **Fewer category hints:** the share of rows with a category word such as "SUPERMARKT" was reduced from 50 % to 30 %, as real descriptions rarely contain such words.
+- The old dataset was kept as `data/transactions_v1.csv` for comparison.
+
+**Keyword rules (`DefaultCategories.java`)**
+- Extended from 45 to 150 keywords, taken from the same public sources.
+- Only long, unique names were added. Short or common names (e.g. otto, tier, spar, norma) were left to the model, because keywords match anywhere in the description (e.g. "spar" in "SPARKASSE").
+
+**Hyperparameter search (`training/train.py`)**
+- The grid search now uses cross-validation grouped by merchant (as in `train_svm.py`). With normal cross-validation, almost all settings scored about 0.99 and C = 100 was selected, which performs worse on unseen merchants. The grouped search selects `ngram_range = (3, 5)` and `C = 1`.
+
+**Leakage prevention**
+- The real transactions were labeled before the merchant sources were chosen. Merchant names and keywords were taken only from the public sources, not from the real data, so the real data remains a fair test set.
+
+### Results on synthetic data
+| Model | Test macro F1 | Unseen-merchant macro F1 |
+|---|---|---|
+| Logistic Regression, old data (Experiment 3) | ~1.00 | ~0.79 |
+| Logistic Regression, new data | 0.995 | 0.690 |
+| Linear SVM, new data | 0.991 | 0.701 |
+
+The unseen-merchant score decreased because the new data is harder: more merchants, fewer category hints, cut-off descriptions and an additional class.
+
+### Results on real transactions
+Script: `training/evaluate.py` (`python -m training.evaluate`). All models were trained on synthetic data only.
+
+| Method | Overall accuracy | In-scope auto-categorized | Accuracy when auto-categorized | Uncategorized wrongly assigned |
+|---|---|---|---|---|
+| Keyword rules (old) | 0.550 | 0.402 | 0.979 | 0.000 |
+| Keyword rules (new) | 0.687 | 0.587 | 0.986 | 0.000 |
+| TF-IDF, old synthetic data (threshold 0.3) | 0.641 | 0.699 | 0.920 | 0.365 |
+| TF-IDF, new synthetic data (threshold 0.3) | 0.777 | 0.712 | 0.985 | 0.006 |
+| App pipeline before (old keywords + old data) | 0.641 | 0.699 | 0.920 | 0.365 |
+| App pipeline after (new keywords + new data) | **0.818** | 0.776 | 0.976 | 0.006 |
+
+Metrics:
+- **Overall accuracy:** share of all 649 transactions that end in the correct category (including correct `Uncategorized`).
+- **In-scope auto-categorized:** share of the 482 in-scope transactions that received a category automatically.
+- **Accuracy when auto-categorized:** accuracy on those automatically categorized in-scope transactions.
+- **Uncategorized wrongly assigned:** share of the 167 out-of-scope transactions that received a category instead of `Uncategorized`.
+
+Most frequent remaining mistakes of the new pipeline:
+
+| Merchant | True category | Predicted | Count |
+|---|---|---|---|
+| TEDI | Shopping | Uncategorized | 9 |
+| Dynamic Food | Eating Out | Uncategorized | 6 |
+| Bershka | Shopping | Uncategorized | 4 |
+| Zam Zam Halal Food | Groceries | Uncategorized | 4 |
+| Too Good To Go | Eating Out | Uncategorized | 4 |
+| Claude | Subscriptions | Uncategorized | 3 |
+| Gelateria Riva | Eating Out | Uncategorized | 3 |
+| New Yorker | Shopping | Uncategorized | 3 |
+| Feneberg | Groceries | Uncategorized | 2 |
+| C&A | Shopping | Uncategorized | 2 |
+
+### Observations
+- **The full app pipeline improved from 0.641 to 0.818 overall accuracy** on real transactions, without any real data in training.
+- **The extended keywords alone raised coverage** from 40 % to 59 % of the in-scope transactions, while staying 98.6 % accurate.
+- **The new synthetic data mainly fixed the out-of-scope problem:** the share of wrongly assigned `Uncategorized` transactions dropped from 36.5 % to 0.6 %. When the model assigns a category, it is correct in 98.5 % of the cases.
+- **All remaining top mistakes are in-scope transactions left as `Uncategorized`**, mostly unknown brand names (e.g. TEDI, Bershka, Dynamic Food). This is the safe type of error: the app does not assign a wrong category, but leaves the transaction for the user.
+- **Synthetic scores do not predict real performance:** the unseen-merchant score on synthetic data decreased (0.79 → 0.69), while the real-data accuracy increased (0.641 → 0.818). The real-data test is therefore used as the main evaluation.
+
+### Decision
+- The new synthetic data (version 2) and the extended keywords are used in the app. The production model was retrained on the new data with the grouped hyperparameter search (`C = 1`, `ngram_range = (3, 5)`).
+
+### Next steps
+- Experiment 5: compare TF-IDF with sentence embeddings and a fine-tuned transformer on the new synthetic data, tested on the real transactions.
+- Experiment 6: train on synthetic plus real data and evaluate on known and brand-new merchants.

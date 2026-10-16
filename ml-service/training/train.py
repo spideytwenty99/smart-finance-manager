@@ -4,7 +4,9 @@ Trains the transaction category classifier and saves it.
 Steps:
 1. Load the synthetic dataset.
 2. Split it into training and test data (80/20, stratified).
-3. Find the best hyperparameters with GridSearchCV (5-fold CV on the training data).
+3. Find the best hyperparameters with GridSearchCV. The search uses
+   cross-validation grouped by merchant, so it picks the settings that work
+   best on merchants the model has not seen (same as train_svm.py).
 4. Evaluate on the test data: accuracy, macro F1, classification report, confusion matrix.
 5. Check how well the model handles merchants it has never seen
    (4-fold cross-validation grouped by merchant, every merchant held out once).
@@ -55,8 +57,8 @@ def main():
     groups = df["merchant"]
 
     #Split into training and test data
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y,
+    X_train, X_test, y_train, y_test, groups_train, groups_test = train_test_split(
+        X, y, groups,
         test_size=0.2,
         random_state=42,
         stratify=y
@@ -77,19 +79,22 @@ def main():
         "logisticregression__C": [0.1, 1, 10, 100]
     }
 
+    # Grouped by merchant: every merchant is either in training or in validation
+    tuning_cv = StratifiedGroupKFold(n_splits=4, shuffle=True, random_state=42)
+
     search = GridSearchCV(
         model,
         parameters,
-        cv=5,
+        cv=tuning_cv,
         scoring="f1_macro"
     )
 
-    search.fit(X_train, y_train)
+    search.fit(X_train, y_train, groups=groups_train)
 
     model = search.best_estimator_
 
     print("\nBest parameters:", search.best_params_)
-    print("Cross-validation Macro F1:", round(search.best_score_, 3))
+    print("Grouped cross-validation Macro F1:", round(search.best_score_, 3))
 
     #Evaluate on the test data
     predictions = model.predict(X_test)
