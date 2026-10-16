@@ -4,6 +4,8 @@
 
 A REST API for personal finance: track income and expenses, set monthly budgets per category, and get a monthly report showing where your money went. Transactions without a category are categorized automatically, first by the user's keyword rules and then by a machine learning model. Every user has their own account, and all data is private to that user.
 
+Evaluated on 649 real, hand-labeled bank transactions, the automatic categorization assigns the correct category in **82%** of cases (up from 64%), and when it assigns a category, it is correct **98%** of the time.
+
 ## Features
 
 - **User accounts**: register and log in with email and password; passwords are hashed with BCrypt
@@ -11,8 +13,8 @@ A REST API for personal finance: track income and expenses, set monthly budgets 
 - **Private data per user**: every category, transaction and budget belongs to one user; other users' data returns 404, as if it didn't exist
 - **Transactions**: create, update, delete and list, filtered by month, date range or category
 - **Automatic categorization in two stages**:
-    - **Keyword rules**: "REWE Frankfurt Hbf" lands in Groceries; the longest matching keyword wins, and only the user's own categories are considered
-    - **Machine learning**: transactions no rule covers are sent to an ML service; its prediction is used only when the model is confident enough, otherwise the transaction stays Uncategorized
+  - **Keyword rules**: "REWE Frankfurt Hbf" lands in Groceries; the longest matching keyword wins, and only the user's own categories are considered
+  - **Machine learning**: transactions no rule covers are sent to an ML service; its prediction is used only when the model is confident enough, otherwise the transaction stays Uncategorized
 - **Default categories**: every new user gets their own starter set with German-relevant keywords, which they can rename, extend or delete
 - **Monthly budgets**: one spending limit per expense category and month
 - **Monthly report**: income, expenses, balance, and per category how much of the budget is used (OK, WARNING from 80%, OVER_LIMIT above 100%)
@@ -28,12 +30,12 @@ A REST API for personal finance: track income and expenses, set monthly budgets 
 │    Client    │ ───▶  │   Spring Boot API     │ ───▶  │   PostgreSQL     │
 │ (Swagger UI) │       │   :8080               │       │   :5433          │
 └──────────────┘       └───────────┬───────────┘       └──────────────────┘
-                                  │ POST /predict/category
-                                  ▼
-                      ┌───────────────────────┐
-                      │   ML service (FastAPI)│
-                      │   :8000               │
-                      └───────────────────────┘
+                                   │ POST /predict/category
+                                   ▼
+                       ┌───────────────────────┐
+                       │ ML service (FastAPI)  │
+                       │   :8000               │
+                       └───────────────────────┘
 ```
 
 When a transaction is created without a category, the Spring app decides in this order:
@@ -48,15 +50,19 @@ If the ML service is unavailable, the app continues without it. Creating a trans
 
 The ML service (`ml-service/`) classifies bank transaction descriptions into categories using **TF-IDF character n-grams + Logistic Regression** (scikit-learn).
 
-Since no public dataset of labeled German bank transactions exists, the model is trained on a **synthetic dataset** of 4,400 transactions, built from real German merchant names and typical German bank text patterns (card payments, PayPal, SEPA direct debits, standing orders, salary, refunds).
+**Training data.** No public dataset of labeled German bank transactions exists, so the model is trained on a **synthetic dataset** of 4,800 transactions. It uses 369 merchants, including 227 real merchant names collected from 12 public sources (`ml-service/training/merchants.py`), typical German bank text formats (card payments, PayPal, SumUp, SEPA direct debits, standing orders, salary, refunds), and an `Uncategorized` class for transfers, top-ups, cash and bank fees.
 
-| Evaluation | Result |
-|---|---|
-| Merchants seen in training | macro F1 **1.000** |
-| Merchants never seen in training | macro F1 **0.789** |
-| Unseen merchants, confidence ≥ 0.3 | **93% accuracy** on 78% of transactions |
+**Evaluation on real data.** The system was tested on 649 real bank transactions from four people, anonymized and labeled by hand. They are used for testing only and are never committed. Results for the full app pipeline (keyword rules first, then the model with a confidence threshold of 0.3):
 
-Evaluation on unseen merchants uses cross-validation grouped by merchant, so the test data only contains merchants the model has never seen. The full experiment log, including a comparison with a Linear SVM and the effect of each data change, is in [docs/ml-experiments.md](docs/ml-experiments.md).
+| | Before | After |
+|---|---|---|
+| Overall accuracy | 0.641 | **0.818** |
+| Accuracy when a category is assigned | 0.920 | **0.976** |
+| Transfers, top-ups etc. wrongly given a category | 36.5% | **0.6%** |
+
+"Before" is the first version (smaller synthetic dataset, 45 keywords); "after" adds the realistic synthetic data and 150 keywords from the same public sources. No real transaction was used for training, and merchant names were never taken from the real data.
+
+The full experiment log, including a comparison with a Linear SVM, evaluation on unseen merchants and the reasoning behind each decision, is in [docs/ml-experiments.md](docs/ml-experiments.md).
 
 ## Tech Stack
 
@@ -234,15 +240,15 @@ smart-finance-manager
 │   └── config          security and OpenAPI configuration
 └── ml-service
     ├── app             FastAPI service, model loading, text preprocessing
-    ├── training        synthetic data generator, training and model comparison
-    ├── data            synthetic dataset
+    ├── training        public merchant lists, synthetic data generator, training and evaluation
+    ├── data            synthetic datasets (real test data stays local and is never committed)
     └── tests           pytest tests
 ```
 
 ## Next
 
-- Sentence embeddings as an alternative model, evaluated on real hand-labeled transactions
-- Learning from user corrections to improve the model over time
+- Learning from user corrections, so a merchant is categorized correctly after the first manual change
+- Database migrations with Flyway instead of Hibernate schema updates
 - An AI assistant that answers questions about your spending and budgets
 - A small React frontend with a dashboard, transactions and budgets
 
