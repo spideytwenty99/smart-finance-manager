@@ -525,3 +525,49 @@ All experiments, including the reasoning behind each step, are documented in `do
 - Experiment 4: sentence embeddings vs TF-IDF, on synthetic and real hand-labeled transactions (on a separate branch)
 - Track the category source (manual, rule, ML, none) to measure how often each is used and corrected
 - Explore an optional AI assistant that answers questions about the user's spending and budgets.
+
+## 2026-10-16: Realistic synthetic data and extended keyword rules (Experiment 4)
+
+The categorization was evaluated on real bank transactions for the first time. Based on the results, the synthetic training data was made more realistic and the default keyword rules were extended.
+
+### Real-data evaluation
+- 649 real transactions from four persons were collected, anonymized and labeled by hand.
+- The labels were mapped to the app categories; transactions without a matching category (e.g. transfers, top-ups, hotels) were labeled `Uncategorized`.
+- The data is stored in `ml-service/data/private/` (gitignored) and is used for testing only, never for training.
+
+### Synthetic data (version 2)
+- `training/merchants.py` was added with 227 real merchant names from 12 public sources (Wikipedia, online-store rankings, app and streaming lists). Each name is tagged with its source.
+- `training/generate_data.py` was extended:
+  - Merchants: original lists combined with the public merchant names (369 in total, previously 187).
+  - Bank formats: payment provider prefixes (`SUMUP *`, `NYX*`, `PAYPAL *`), branch numbers, legal forms and card descriptions cut off after 22 characters.
+  - A new `Uncategorized` class built from standard German booking texts (top-ups, transfers, cash, bank fees, savings).
+  - The share of category hint words was reduced from 50 % to 30 %.
+- The previous dataset was kept as `data/transactions_v1.csv` for comparison.
+
+### Keyword rules
+- The default keywords in `DefaultCategories.java` were extended from 45 to 150, using only long and unique names from the same public sources.
+- Short or common names (e.g. otto, spar, norma) were left to the model, since keywords match anywhere in the description.
+- The new keywords only apply to newly registered users; existing categories in the database are not changed.
+
+### Training and evaluation
+- The hyperparameter search in `training/train.py` was changed to cross-validation grouped by merchant, as already used in `train_svm.py`. The previous search selected `C = 100`, which performed worse on unseen merchants; the grouped search selects `C = 1` and `ngram_range = (3, 5)`.
+- `training/evaluate.py` was rewritten to compare old and new keywords and old and new synthetic data on the real transactions.
+- The production model was retrained on the new data.
+
+### Results
+- App pipeline accuracy on real transactions improved from 0.641 to 0.818.
+- Wrongly assigned `Uncategorized` transactions dropped from 36.5 % to 0.6 %.
+- Details are documented in `docs/ml-experiments.md` (Experiment 4).
+
+### Repository cleanup
+- Committed `__pycache__` files were removed from version control.
+- `training/svm.py` was renamed to `training/train_svm.py`.
+
+### Verification
+- Python tests (`pytest`) and Spring tests (`mvn test`) passed.
+- The Docker image was rebuilt and the retrained model was checked through the `/predict/category` endpoint (e.g. "N26 TOP-UP" → `Uncategorized`).
+
+### Next steps
+- Explore further model improvements (e.g. confidence calibration for a fine-tuned transformer, training with real data).
+- Optional: AI assistant for questions about spending.
+- Frontend for the app.
